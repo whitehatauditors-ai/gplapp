@@ -409,7 +409,7 @@
       const map = grouped.get(status);
       if (!map.has(key)) {
         const displayDriver = driver;
-        map.set(key, { DriverName: displayDriver, PackageQty: 0, Rate: rateMap.get(key) ?? defaultRate, Discount: 0, Claims: 0, TotalDriverPayment: 0, DaysWorked: new Set() });
+        map.set(key, { DriverName: displayDriver, PackageQty: 0, Rate: rateMap.get(key) ?? defaultRate, Claims: 0, TotalDriverPayment: 0, DaysWorked: new Set() });
         order[status].push(key);
       }
       return map.get(key);
@@ -438,20 +438,18 @@
     for (const status of Object.keys(statusRows)) {
       const map = grouped.get(status) || new Map();
       const keys = status === 'Delivered' ? [...order[status]].sort((a, b) => String(map.get(a)?.DriverName || '').localeCompare(String(map.get(b)?.DriverName || ''))) : order[status];
-      const totals = { PackageQty: 0, Rate: 0, Discount: 0, Claims: 0, TotalDriverPayment: 0 };
+      const totals = { PackageQty: 0, Rate: 0, Claims: 0, TotalDriverPayment: 0 };
       for (const key of keys) {
         const rec = map.get(key);
         if (!rec) continue;
         const packageQty = Number(rec.PackageQty || 0);
         const rate = Number(rec.Rate || 0);
-        const discount = 0;
         const claims = status === 'Delivered' ? Number(claimMap.get(key) || 0) : 0;
         const totalPayment = status === 'Delivered' ? packageQty * 1.6 + claims : 0;
         const row = {
           DriverName: rec.DriverName,
           PackageQty: packageQty,
           Rate: rate,
-          Discount: discount,
           Claims: claims,
           TotalDriverPayment: totalPayment,
           DaysWorked: rec.DaysWorked.size,
@@ -459,7 +457,6 @@
         statusRows[status].push(row);
         totals.PackageQty += packageQty;
         totals.Rate += rate;
-        totals.Discount += discount;
         totals.Claims += claims;
         totals.TotalDriverPayment += totalPayment;
       }
@@ -487,8 +484,8 @@
     const sectionTableHtml = (status, rows, totals) => {
       const deliveredOnly = status === 'Delivered';
       if (deliveredOnly) {
-        const body = rows.map((r) => `<tr><td>${esc(r.DriverName)}</td><td class='r'>${num(r.PackageQty)}</td><td class='r'>${money(r.Rate)}</td><td class='r'>${money(r.Discount)}</td><td class='r'>${money(r.Claims)}</td><td class='r'>${money(r.TotalDriverPayment)}</td></tr>`).join('') || "<tr><td colspan='6'>No rows found.</td></tr>";
-        return `<section class='block'><div class='section-head'><h2>${esc(status)}</h2><p>All delivered packages pay <strong>$1.60 each</strong>. Claims remain separate deductions. Days worked is counted from distinct <code>planDeliveryDate</code> values.</p></div><table><thead><tr><th>DriverName</th><th class='r'>Package Qty</th><th class='r'>Rate</th><th class='r'>Discount</th><th class='r'>Claims</th><th class='r'>Total Driver Payment</th></tr></thead><tbody>${body}</tbody><tfoot><tr><td>Total</td><td class='r'>${num(totals.PackageQty)}</td><td class='r'>${money(totals.Rate)}</td><td class='r'>${money(totals.Discount)}</td><td class='r'>${money(totals.Claims)}</td><td class='r'>${money(totals.TotalDriverPayment)}</td></tr></tfoot></table></section>`;
+        const body = rows.map((r) => `<tr><td>${esc(r.DriverName)}</td><td class='r'>${num(r.PackageQty)}</td><td class='r'>${money(r.Rate)}</td><td class='r'>${money(r.Claims)}</td><td class='r'>${money(r.TotalDriverPayment)}</td></tr>`).join('') || "<tr><td colspan='5'>No rows found.</td></tr>";
+        return `<section class='block'><div class='section-head'><h2>${esc(status)}</h2><p>All delivered packages pay <strong>$1.60 each</strong>. Claims remain separate deductions. Days worked is counted from distinct <code>planDeliveryDate</code> values.</p></div><table><thead><tr><th>DriverName</th><th class='r'>Package Qty</th><th class='r'>Rate</th><th class='r'>Claims</th><th class='r'>Total Driver Payment</th></tr></thead><tbody>${body}</tbody><tfoot><tr><td>Total</td><td class='r'>${num(totals.PackageQty)}</td><td class='r'>${money(totals.Rate)}</td><td class='r'>${money(totals.Claims)}</td><td class='r'>${money(totals.TotalDriverPayment)}</td></tr></tfoot></table></section>`;
       }
       const body = rows.map((r) => `<tr><td>${esc(r.DriverName)}</td><td class='r'>${num(r.PackageQty)}</td></tr>`).join('') || "<tr><td colspan='2'>No rows found.</td></tr>";
       return `<section class='block compact'><div class='section-head'><h2>${esc(status)}</h2><p>Not payable.</p></div><table><thead><tr><th>DriverName</th><th class='r'>Package Qty</th></tr></thead><tbody>${body}</tbody><tfoot><tr><td>Total</td><td class='r'>${num(totals.PackageQty)}</td></tr></tfoot></table></section>`;
@@ -511,10 +508,10 @@
         ['Claims Only Total', claimOnlyTotal],
         ['Ignored Rows', ignoredRows],
         [],
-        ['Status', 'DriverName', 'Package Qty', 'Rate', 'Discount', 'Claims', 'Total Driver Payment', 'Days Worked'],
+        ['Status', 'DriverName', 'Package Qty', 'Rate', 'Claims', 'Total Driver Payment', 'Days Worked'],
       ];
       const appendRows = (status) => {
-        statusRows[status].forEach((r) => summaryRows.push([status, r.DriverName, Number(r.PackageQty), Number(r.Rate), Number(r.Discount), Number(r.Claims), Number(r.TotalDriverPayment), Number(r.DaysWorked)]));
+        statusRows[status].forEach((r) => summaryRows.push([status, r.DriverName, Number(r.PackageQty), Number(r.Rate), Number(r.Claims), Number(r.TotalDriverPayment), Number(r.DaysWorked)]));
       };
       ['Delivered', 'Failed Attempt', 'Out for delivery', 'Returned sort Center', 'Blanks'].forEach(appendRows);
       summaryRows.push(['Grand Total', '', '', '', '', '', Number(grandTotal), '']);
@@ -646,7 +643,7 @@
         const deliveredRows = data.statusRows.Delivered || [];
         const statementHtml = (row) => `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>GPL Driver Statement - ${esc(row.DriverName)}</title><style>
-body{font-family:Arial,sans-serif;background:#0f172a;color:#e5e7eb;margin:0;padding:24px}main{max-width:900px;margin:auto;background:#111827;border:1px solid #374151;border-radius:18px;overflow:hidden}header{padding:24px;background:linear-gradient(135deg,#07111f,#173b6a);text-align:center}header img{display:block;width:min(260px,75vw);height:auto;margin:0 auto 16px}h1{margin:0 0 8px;font-size:30px}.sub{margin:0;color:#cbd5e1;line-height:1.5}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;padding:24px}.card{border:1px solid #374151;border-radius:14px;padding:16px;background:#0b1220}.label{font-size:12px;text-transform:uppercase;color:#94a3b8;letter-spacing:.06em}.value{font-size:22px;font-weight:800;margin-top:6px;color:#fff}.net{border-color:#14532d;background:#0d1f17}.note{padding:0 24px 24px;color:#94a3b8}</style></head><body><main><header><img src="https://whitehatdata.us/gpl/assets/gpl-logo.jpg" alt="Global Pack Logistics logo"><h1>Global Pack Logistics Driver Statement</h1><p class="sub">Driver: <strong>${esc(row.DriverName)}</strong> · Warehouse: <strong>${esc(warehouse)}</strong></p></header><section class="grid"><div class="card"><div class="label">Package Qty</div><div class="value">${num(row.PackageQty)}</div></div><div class="card"><div class="label">Rate Total</div><div class="value">${money(row.Rate)}</div></div><div class="card"><div class="label">Discount</div><div class="value">${money(row.Discount)}</div></div><div class="card"><div class="label">Claims</div><div class="value">${money(row.Claims)}</div></div><div class="card"><div class="label">Days Worked</div><div class="value">${num(row.DaysWorked)}</div></div><div class="card net"><div class="label">Total Driver Payment</div><div class="value">${money(row.TotalDriverPayment)}</div></div></section><div class="note">Generated in the browser from the GPLApp workbook. Source sheet: ${esc(data.sourceTitle)}.</div></main></body></html>`;
+<body{font-family:Arial,sans-serif;background:#0f172a;color:#e5e7eb;margin:0;padding:24px}main{max-width:900px;margin:auto;background:#111827;border:1px solid #374151;border-radius:18px;overflow:hidden}header{padding:24px;background:linear-gradient(135deg,#07111f,#173b6a);text-align:center}header img{display:block;width:min(260px,75vw);height:auto;margin:0 auto 16px}h1{margin:0 0 8px;font-size:30px}.sub{margin:0;color:#cbd5e1;line-height:1.5}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;padding:24px}.card{border:1px solid #374151;border-radius:14px;padding:16px;background:#0b1220}.label{font-size:12px;text-transform:uppercase;color:#94a3b8;letter-spacing:.06em}.value{font-size:22px;font-weight:800;margin-top:6px;color:#fff}.net{border-color:#14532d;background:#0d1f17}.note{padding:0 24px 24px;color:#94a3b8}</style></head><body><main><header><img src="https://whitehatdata.us/gpl/assets/gpl-logo.jpg" alt="Global Pack Logistics logo"><h1>Global Pack Logistics Driver Statement</h1><p class="sub">Driver: <strong>${esc(row.DriverName)}</strong> · Warehouse: <strong>${esc(warehouse)}</strong></p></header><section class="grid"><div class="card"><div class="label">Package Qty</div><div class="value">${num(row.PackageQty)}</div></div><div class="card"><div class="label">Rate Total</div><div class="value">${money(row.Rate)}</div></div><div class="card"><div class="label">Claims</div><div class="value">${money(row.Claims)}</div></div><div class="card"><div class="label">Days Worked</div><div class="value">${num(row.DaysWorked)}</div></div><div class="card net"><div class="label">Total Driver Payment</div><div class="value">${money(row.TotalDriverPayment)}</div></div></section><div class="note">Generated in the browser from the GPLApp workbook. Source sheet: ${esc(data.sourceTitle)}.</div></main></body></html>`;
         const zip = new JSZip();
         deliveredRows.forEach((row, index) => {
           const safe = String(row.DriverName || `Driver_${index + 1}`).replace(/[^a-z0-9-_]+/gi, '_').replace(/_+/g, '_').replace(/^_|_$/g, '') || `Driver_${index + 1}`;
@@ -703,7 +700,6 @@ body{font-family:Arial,sans-serif;background:#0f172a;color:#e5e7eb;margin:0;padd
         return `<section class='statement'><div class='statement-head'><div><div class='statement-kicker'>${esc(status)}</div><h3>${esc(status)}</h3></div><div class='statement-total'>Package Qty<br><strong>${num(t.PackageQty)}</strong></div></div><div class='statement-grid'>${status === 'Delivered' ? `
           <div class='statement-item'><span>Package Qty</span><strong>${num(t.PackageQty)}</strong></div>
           <div class='statement-item'><span>Rate Total</span><strong>${money(t.Rate)}</strong></div>
-          <div class='statement-item'><span>Discount</span><strong>${money(t.Discount)}</strong></div>
           <div class='statement-item'><span>Claims</span><strong>${money(t.Claims)}</strong></div>
           <div class='statement-item statement-net'><span>Total Driver Payment</span><strong>${money(t.TotalDriverPayment)}</strong></div>` : `
           <div class='statement-item'><span>Package Qty</span><strong>${num(t.PackageQty)}</strong></div>`}</div></section>`;
