@@ -172,7 +172,7 @@
       <h1>Global Pack Logistics Summary Runner</h1>
       <p class="sub">Summary mode template for Global Pack Logistics. The warehouse and payment rules are provisional Lluberes template defaults pending GPL configuration. The browser processes the workbook locally so Cloudflare can host the app shell.</p>
       <div class="badges">
-        <span class="badge">Template warehouse: EWR</span>
+        <span class="badge">Template warehouse: Tallahassee</span>
         <span class="badge">Formats: HTML + Excel</span>
         <span class="badge">Browser-side processing</span>
         <span class="badge">Customer since: configure</span>
@@ -192,7 +192,7 @@
           <div>
             <label for="warehouse">Warehouse</label>
             <select id="warehouse" name="Warehouse" disabled>
-              <option value="EWR" selected>EWR</option>
+              <option value="Tallahassee" selected>Tallahassee</option>
             </select>
           </div>
           <div class="full">
@@ -633,7 +633,7 @@
 
     try {
       const ruleSource = el('rule-source').value || 'Company';
-      const warehouse = 'EWR';
+      const warehouse = 'Tallahassee';
       const data = await generate(file, ruleSource, warehouse);
       const summaryBlob = new Blob([data.summaryWorkbookArray], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       const htmlBlob = new Blob([data.summaryHtml], { type: 'text/html;charset=utf-8' });
