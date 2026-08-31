@@ -183,6 +183,13 @@
       <form id="runner">
         <div class="form-grid">
           <div>
+            <label for="mode">Mode</label>
+            <select id="mode" name="Mode">
+              <option value="Summary" selected>Summary</option>
+              <option value="Driver Statements">Driver Statements</option>
+            </select>
+          </div>
+          <div>
             <label for="rule-source">Payment Rules Source</label>
             <select id="rule-source" name="RuleSource">
               <option value="Company" selected>Excel / Company</option>
@@ -481,11 +488,11 @@
     const sectionTableHtml = (status, rows, totals) => {
       const deliveredOnly = status === 'Delivered';
       if (deliveredOnly) {
-        const body = rows.map((r) => `<tr><td>${esc(r.DriverName)}</td><td class='r'>${numFmt(r.PackageQty)}</td><td class='r'>${moneyFmt(r.Rate)}</td><td class='r'>${moneyFmt(r.Discount)}</td><td class='r'>${moneyFmt(r.Claims)}</td><td class='r'>${moneyFmt(r.TotalDriverPayment)}</td></tr>`).join('') || "<tr><td colspan='6'>No rows found.</td></tr>";
-        return `<section class='block'><div class='section-head'><h2>${esc(status)}</h2><p>Days worked is counted from distinct <code>planDeliveryDate</code> values. Only <strong>Delivered</strong> rows are payable for now.</p></div><table><thead><tr><th>DriverName</th><th class='r'>Package Qty</th><th class='r'>Rate</th><th class='r'>Discount</th><th class='r'>Claims</th><th class='r'>Total Driver Payment</th></tr></thead><tbody>${body}</tbody><tfoot><tr><td>Total</td><td class='r'>${numFmt(totals.PackageQty)}</td><td class='r'>${moneyFmt(totals.Rate)}</td><td class='r'>${moneyFmt(totals.Discount)}</td><td class='r'>${moneyFmt(totals.Claims)}</td><td class='r'>${moneyFmt(totals.TotalDriverPayment)}</td></tr></tfoot></table></section>`;
+        const body = rows.map((r) => `<tr><td>${esc(r.DriverName)}</td><td class='r'>${num(r.PackageQty)}</td><td class='r'>${money(r.Rate)}</td><td class='r'>${money(r.Discount)}</td><td class='r'>${money(r.Claims)}</td><td class='r'>${money(r.TotalDriverPayment)}</td></tr>`).join('') || "<tr><td colspan='6'>No rows found.</td></tr>";
+        return `<section class='block'><div class='section-head'><h2>${esc(status)}</h2><p>Days worked is counted from distinct <code>planDeliveryDate</code> values. Only <strong>Delivered</strong> rows are payable for now.</p></div><table><thead><tr><th>DriverName</th><th class='r'>Package Qty</th><th class='r'>Rate</th><th class='r'>Discount</th><th class='r'>Claims</th><th class='r'>Total Driver Payment</th></tr></thead><tbody>${body}</tbody><tfoot><tr><td>Total</td><td class='r'>${num(totals.PackageQty)}</td><td class='r'>${money(totals.Rate)}</td><td class='r'>${money(totals.Discount)}</td><td class='r'>${money(totals.Claims)}</td><td class='r'>${money(totals.TotalDriverPayment)}</td></tr></tfoot></table></section>`;
       }
-      const body = rows.map((r) => `<tr><td>${esc(r.DriverName)}</td><td class='r'>${numFmt(r.PackageQty)}</td></tr>`).join('') || "<tr><td colspan='2'>No rows found.</td></tr>";
-      return `<section class='block compact'><div class='section-head'><h2>${esc(status)}</h2><p>Not payable.</p></div><table><thead><tr><th>DriverName</th><th class='r'>Package Qty</th></tr></thead><tbody>${body}</tbody><tfoot><tr><td>Total</td><td class='r'>${numFmt(totals.PackageQty)}</td></tr></tfoot></table></section>`;
+      const body = rows.map((r) => `<tr><td>${esc(r.DriverName)}</td><td class='r'>${num(r.PackageQty)}</td></tr>`).join('') || "<tr><td colspan='2'>No rows found.</td></tr>";
+      return `<section class='block compact'><div class='section-head'><h2>${esc(status)}</h2><p>Not payable.</p></div><table><thead><tr><th>DriverName</th><th class='r'>Package Qty</th></tr></thead><tbody>${body}</tbody><tfoot><tr><td>Total</td><td class='r'>${num(totals.PackageQty)}</td></tr></tfoot></table></section>`;
     };
 
     const buildSummaryWorkbook = () => {
@@ -533,14 +540,14 @@
         ['Driver Grand Total Payout', deliveredDriverTotal],
         ['Claims Grand Total Payout', claimsGrandTotal],
         ['Claims Only Drivers', claimOnlyRows.length],
-      ].map(([label, value]) => `<div class='card'><div class='label-small'>${esc(label)}</div><div class='value'>${typeof value === 'number' ? (String(value).includes('.') ? numFmt(value) : String(value)) : esc(value)}</div></div>`).join('');
+      ].map(([label, value]) => `<div class='card'><div class='label-small'>${esc(label)}</div><div class='value'>${typeof value === 'number' ? (String(value).includes('.') ? num(value) : String(value)) : esc(value)}</div></div>`).join('');
 
-      const claimHtml = claimOnlyRows.map((r) => `<tr><td>${esc(r.DriverName)}</td><td class='r'>${moneyFmt(r.Claims)}</td></tr>`).join('') || "<tr><td colspan='2'>No unmatched claim-only drivers.</td></tr>";
+      const claimHtml = claimOnlyRows.map((r) => `<tr><td>${esc(r.DriverName)}</td><td class='r'>${money(r.Claims)}</td></tr>`).join('') || "<tr><td colspan='2'>No unmatched claim-only drivers.</td></tr>";
 
       const statusHtml = ['Delivered', 'Failed Attempt', 'Out for delivery', 'Returned sort Center', 'Blanks'].map((status) => sectionTableHtml(status, statusRows[status], statusTotals[status])).join('');
 
       const summarySection = `<div class='summary-grid'>${summaryCards}</div>`;
-      const claimRowsPreview = claimOnlyRows.map((r) => `<li>${esc(r.DriverName)} — ${moneyFmt(r.Claims)}</li>`).join('') || '<li>No claim-only drivers</li>';
+      const claimRowsPreview = claimOnlyRows.map((r) => `<li>${esc(r.DriverName)} — ${money(r.Claims)}</li>`).join('') || '<li>No claim-only drivers</li>';
 
       return `<!doctype html>
 <html lang='en'>
@@ -632,9 +639,35 @@
     setStatus('warnbox', 'Processing workbook in the browser...');
 
     try {
+      const mode = el('mode').value || 'Summary';
       const ruleSource = el('rule-source').value || 'Company';
       const warehouse = 'Tallahassee';
       const data = await generate(file, ruleSource, warehouse);
+      if (mode === 'Driver Statements') {
+        const deliveredRows = data.statusRows.Delivered || [];
+        const statementHtml = (row) => `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>GPL Driver Statement - ${esc(row.DriverName)}</title><style>
+body{font-family:Arial,sans-serif;background:#0f172a;color:#e5e7eb;margin:0;padding:24px}main{max-width:900px;margin:auto;background:#111827;border:1px solid #374151;border-radius:18px;overflow:hidden}header{padding:24px;background:linear-gradient(135deg,#07111f,#173b6a);text-align:center}header img{display:block;width:min(260px,75vw);height:auto;margin:0 auto 16px}h1{margin:0 0 8px;font-size:30px}.sub{margin:0;color:#cbd5e1;line-height:1.5}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;padding:24px}.card{border:1px solid #374151;border-radius:14px;padding:16px;background:#0b1220}.label{font-size:12px;text-transform:uppercase;color:#94a3b8;letter-spacing:.06em}.value{font-size:22px;font-weight:800;margin-top:6px;color:#fff}.net{border-color:#14532d;background:#0d1f17}.note{padding:0 24px 24px;color:#94a3b8}</style></head><body><main><header><img src="https://whitehatdata.us/gpl/assets/gpl-logo.jpg" alt="Global Pack Logistics logo"><h1>Global Pack Logistics Driver Statement</h1><p class="sub">Driver: <strong>${esc(row.DriverName)}</strong> · Warehouse: <strong>${esc(warehouse)}</strong></p></header><section class="grid"><div class="card"><div class="label">Package Qty</div><div class="value">${num(row.PackageQty)}</div></div><div class="card"><div class="label">Rate Total</div><div class="value">${money(row.Rate)}</div></div><div class="card"><div class="label">Discount</div><div class="value">${money(row.Discount)}</div></div><div class="card"><div class="label">Claims</div><div class="value">${money(row.Claims)}</div></div><div class="card"><div class="label">Days Worked</div><div class="value">${num(row.DaysWorked)}</div></div><div class="card net"><div class="label">Total Driver Payment</div><div class="value">${money(row.TotalDriverPayment)}</div></div></section><div class="note">Generated in the browser from the GPLApp workbook. Source sheet: ${esc(sourceTitle)}.</div></main></body></html>`;
+        const zip = new JSZip();
+        deliveredRows.forEach((row, index) => {
+          const safe = String(row.DriverName || `Driver_${index + 1}`).replace(/[^a-z0-9-_]+/gi, '_').replace(/_+/g, '_').replace(/^_|_$/g, '') || `Driver_${index + 1}`;
+          zip.file(`${String(index + 1).padStart(2, '0')}-${safe}.html`, statementHtml(row));
+        });
+        zip.file('README.txt', 'Browser-generated Global Pack Logistics driver statements.');
+        state.zipBlobUrl = URL.createObjectURL(await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' }));
+        el('download-summary').style.display = 'none';
+        el('download-html').style.display = 'none';
+        el('download-zip').href = state.zipBlobUrl;
+        el('download-zip').download = 'Global Pack Logistics_Driver_Statements.zip';
+        el('download-zip').textContent = 'Download GPL Driver Statements ZIP';
+        el('download-zip').style.display = deliveredRows.length ? 'inline-block' : 'none';
+        el('output').hidden = false;
+        el('meta').innerHTML = [`<span class='pill'>Workbook: ${esc(file.name)}</span>`,`<span class='pill'>Mode: Driver Statements</span>`,`<span class='pill'>Warehouse: ${esc(warehouse)}</span>`,`<span class='pill'>Statements: ${deliveredRows.length}</span>`].join('');
+        el('summary-cards').innerHTML = `<div class='summary-grid'><div class='card'><div class='label-small'>Driver Statements</div><div class='value'>${deliveredRows.length}</div></div><div class='card'><div class='label-small'>Total Packages</div><div class='value'>${num(data.totalPackages)}</div></div><div class='card'><div class='label-small'>Total Driver Payment</div><div class='value'>${money(data.deliveredDriverTotal)}</div></div></div>`;
+        el('report').innerHTML = `<h2>Driver Statements</h2><div class='footer-note'>Each delivered driver has an individual GPL-branded HTML statement in the ZIP download.</div><div class='summary-grid'>${deliveredRows.map((row) => `<div class='card'><div class='label-small'>${esc(row.DriverName)}</div><div class='value'>${money(row.TotalDriverPayment)}</div></div>`).join('') || '<div class="card">No delivered driver statements found.</div>'}</div>`;
+        setStatus('success', `Generated ${deliveredRows.length} Global Pack Logistics driver statements successfully in the browser.`);
+        return;
+      }
       const summaryBlob = new Blob([data.summaryWorkbookArray], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       const htmlBlob = new Blob([data.summaryHtml], { type: 'text/html;charset=utf-8' });
       state.summaryBlobUrl = URL.createObjectURL(summaryBlob);
@@ -653,6 +686,7 @@
       el('output').hidden = false;
       el('meta').innerHTML = [
         `<span class='pill'>Workbook: ${esc(file.name)}</span>`,
+        `<span class='pill'>Mode: ${esc(mode)}</span>`,
         `<span class='pill'>Rule Source: ${esc(ruleSource)}</span>`,
         `<span class='pill'>Warehouse: ${esc(warehouse)}</span>`,
         `<span class='pill'>Drivers: ${data.uniqueDrivers}</span>`,
