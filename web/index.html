@@ -170,7 +170,7 @@
     <header>
       <div class="logo-wrap"><img class="logo-mark" src="./assets/gpl-logo.jpg" alt="Global Pack Logistics logo" /></div>
       <h1>Global Pack Logistics Summary Runner</h1>
-      <p class="sub">Summary mode template for Global Pack Logistics. The warehouse and payment rules are provisional Lluberes template defaults pending GPL configuration. The browser processes the workbook locally so Cloudflare can host the app shell.</p>
+      <p class="sub">Summary and driver statement portal for Global Pack Logistics. Delivered packages are paid at $1.60 each, with claims kept as separate deductions. The browser processes the workbook locally so Cloudflare can host the app shell.</p>
       <div class="badges">
         <span class="badge">Template warehouse: Tallahassee</span>
         <span class="badge">Formats: HTML + Excel</span>
@@ -341,7 +341,7 @@
     const dayIdx = headerMap.get('plandeliverydate');
 
     const defaultRate = 1.6;
-    const rateText = `2.00|Dileiry Lizardo`;
+    const rateText = '';
     const rateMap = new Map();
     rateText.split(/\r?\n/).forEach((line) => {
       const trimmed = line.trim();
@@ -383,7 +383,6 @@
         if (!amount) continue;
         const key = norm(driver);
         let display = driver.replace(/\s+/g, ' ').trim();
-        if (!rateMap.has(key)) display = `${display} - New Driver`;
         if (!claimDisplayNames.has(key)) claimDisplayNames.set(key, display);
         claimMap.set(key, (claimMap.get(key) || 0) - amount);
       }
@@ -409,7 +408,7 @@
       if (!grouped.has(status)) grouped.set(status, new Map());
       const map = grouped.get(status);
       if (!map.has(key)) {
-        const displayDriver = rateMap.has(key) ? driver : `${driver} - New Driver`;
+        const displayDriver = driver;
         map.set(key, { DriverName: displayDriver, PackageQty: 0, Rate: rateMap.get(key) ?? defaultRate, Discount: 0, Claims: 0, TotalDriverPayment: 0, DaysWorked: new Set() });
         order[status].push(key);
       }
@@ -445,9 +444,9 @@
         if (!rec) continue;
         const packageQty = Number(rec.PackageQty || 0);
         const rate = Number(rec.Rate || 0);
-        const discount = status === 'Delivered' ? -60 : 0;
+        const discount = 0;
         const claims = status === 'Delivered' ? Number(claimMap.get(key) || 0) : 0;
-        const totalPayment = status === 'Delivered' ? packageQty * rate + discount + claims : 0;
+        const totalPayment = status === 'Delivered' ? packageQty * 1.6 + claims : 0;
         const row = {
           DriverName: rec.DriverName,
           PackageQty: packageQty,
@@ -489,7 +488,7 @@
       const deliveredOnly = status === 'Delivered';
       if (deliveredOnly) {
         const body = rows.map((r) => `<tr><td>${esc(r.DriverName)}</td><td class='r'>${num(r.PackageQty)}</td><td class='r'>${money(r.Rate)}</td><td class='r'>${money(r.Discount)}</td><td class='r'>${money(r.Claims)}</td><td class='r'>${money(r.TotalDriverPayment)}</td></tr>`).join('') || "<tr><td colspan='6'>No rows found.</td></tr>";
-        return `<section class='block'><div class='section-head'><h2>${esc(status)}</h2><p>Days worked is counted from distinct <code>planDeliveryDate</code> values. Only <strong>Delivered</strong> rows are payable for now.</p></div><table><thead><tr><th>DriverName</th><th class='r'>Package Qty</th><th class='r'>Rate</th><th class='r'>Discount</th><th class='r'>Claims</th><th class='r'>Total Driver Payment</th></tr></thead><tbody>${body}</tbody><tfoot><tr><td>Total</td><td class='r'>${num(totals.PackageQty)}</td><td class='r'>${money(totals.Rate)}</td><td class='r'>${money(totals.Discount)}</td><td class='r'>${money(totals.Claims)}</td><td class='r'>${money(totals.TotalDriverPayment)}</td></tr></tfoot></table></section>`;
+        return `<section class='block'><div class='section-head'><h2>${esc(status)}</h2><p>All delivered packages pay <strong>$1.60 each</strong>. Claims remain separate deductions. Days worked is counted from distinct <code>planDeliveryDate</code> values.</p></div><table><thead><tr><th>DriverName</th><th class='r'>Package Qty</th><th class='r'>Rate</th><th class='r'>Discount</th><th class='r'>Claims</th><th class='r'>Total Driver Payment</th></tr></thead><tbody>${body}</tbody><tfoot><tr><td>Total</td><td class='r'>${num(totals.PackageQty)}</td><td class='r'>${money(totals.Rate)}</td><td class='r'>${money(totals.Discount)}</td><td class='r'>${money(totals.Claims)}</td><td class='r'>${money(totals.TotalDriverPayment)}</td></tr></tfoot></table></section>`;
       }
       const body = rows.map((r) => `<tr><td>${esc(r.DriverName)}</td><td class='r'>${num(r.PackageQty)}</td></tr>`).join('') || "<tr><td colspan='2'>No rows found.</td></tr>";
       return `<section class='block compact'><div class='section-head'><h2>${esc(status)}</h2><p>Not payable.</p></div><table><thead><tr><th>DriverName</th><th class='r'>Package Qty</th></tr></thead><tbody>${body}</tbody><tfoot><tr><td>Total</td><td class='r'>${num(totals.PackageQty)}</td></tr></tfoot></table></section>`;
