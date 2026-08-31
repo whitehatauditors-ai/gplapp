@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.env
+.env.*
+!.env.example
+*.log
+*.sqlite3
+*.db
+.lluberes_session_secret
+uploads/
+outputs/
+downloads/

@@ -1,0 +1,702 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Global Pack Logistics Summary Runner</title>
+  <meta name="robots" content="noindex,nofollow" />
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07111f;
+      --panel: #111827;
+      --panel-2: #0b1220;
+      --line: #374151;
+      --text: #e5e7eb;
+      --muted: #94a3b8;
+      --accent: #d71920;
+      --accent-2: #1f2937;
+      --good: #22c55e;
+      --warn: #f59e0b;
+      --bad: #ef4444;
+      --blue: #93c5fd;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 24px;
+      background: linear-gradient(180deg, #020617, #0f172a 24%, #020617);
+      color: var(--text);
+      font-family: Arial, sans-serif;
+    }
+    body.locked { overflow: hidden; }
+    body.locked > main { display: none; }
+    body:not(.locked) .login-shell { display: none; }
+    .login-shell {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: rgba(2, 6, 23, 0.88);
+    }
+    .login-card {
+      width: min(460px, 100%);
+      background: rgba(17, 24, 39, 0.98);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 24px;
+      box-shadow: 0 24px 70px rgba(0, 0, 0, 0.42);
+    }
+    .logo-wrap { display:flex; align-items:center; justify-content:center; margin-bottom: 16px; }
+    .logo-mark { display:block; width:min(320px, 78vw); height:auto; object-fit:contain; }
+    .login-logo { display:block; width:min(260px, 72vw); height:auto; margin:0 auto 16px; object-fit:contain; }
+    .login-card h2 { margin: 0 0 8px; font-size: 24px; }
+    .login-card p { margin: 0 0 16px; color: var(--muted); line-height: 1.5; }
+    .login-card label { margin-top: 12px; }
+    .login-card button { width: 100%; margin-top: 18px; }
+    .login-note { margin-top: 12px; font-size: 12px; color: var(--muted); line-height: 1.45; }
+    main {
+      max-width: 1180px;
+      margin: 32px auto;
+      background: rgba(17, 24, 39, 0.96);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      box-shadow: 0 20px 60px rgba(15, 23, 42, .28);
+      overflow: hidden;
+    }
+    header {
+      padding: 24px;
+      background: linear-gradient(135deg, var(--bg), #173b6a);
+      border-bottom: 1px solid var(--line);
+    }
+    h1 { margin: 0 0 8px; font-size: 34px; letter-spacing: -0.5px; }
+    .sub { margin: 0; color: #cbd5e1; line-height: 1.55; max-width: 72ch; }
+    .badges { margin-top: 14px; display: flex; gap: 10px; flex-wrap: wrap; }
+    .badge {
+      display: inline-block;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: #1f2937;
+      color: #fde68a;
+      font-weight: 800;
+      font-size: 12px;
+      border: 1px solid var(--line);
+    }
+    .panel { padding: 22px 24px 24px; border-bottom: 1px solid var(--line); }
+    .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+    @media (max-width: 820px) { .form-grid { grid-template-columns: 1fr; } }
+    label { display: block; margin: 0 0 8px; font-weight: 700; color: #e5e7eb; }
+    input, select {
+      width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--line);
+      background: #020617; color: var(--text); font-size: 15px;
+    }
+    .full { grid-column: 1 / -1; }
+    .actions { margin-top: 18px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+    button, .link-btn {
+      border: 0; border-radius: 10px; background: var(--accent); color: #fff; font-weight: 800; cursor: pointer;
+      padding: 13px 18px; text-decoration: none; display: inline-block;
+    }
+    button:disabled { opacity: .9; cursor: wait; }
+    .secondary { background: var(--accent-2); color: #e5e7eb; }
+    .hint, .error, .success, .warnbox {
+      margin-top: 16px; padding: 14px 16px; border-radius: 12px; line-height: 1.55;
+    }
+    .hint { background: #1f2937; border: 1px solid var(--line); color: #cbd5e1; }
+    .warnbox { background: #1f1308; border: 1px solid #92400e; color: #fbbf24; }
+    .error { background: #2a1111; border: 1px solid #7f1d1d; color: #fecaca; }
+    .success { background: #0f1f17; border: 1px solid #14532d; color: #bbf7d0; }
+    .spinner { display:inline-block; width:0.9em; height:0.9em; margin-left:0.5em; border:2px solid rgba(17,24,39,.25); border-top-color: currentColor; border-radius:50%; vertical-align:-0.15em; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .content { padding: 24px; }
+    .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 18px; }
+    .card { border: 1px solid var(--line); border-radius: 14px; padding: 14px; background: var(--panel-2); }
+    .label-small { font-size: 12px; text-transform: uppercase; color: var(--muted); letter-spacing: .06em; }
+    .value { font-size: 22px; font-weight: 800; margin-top: 6px; color: #fff; }
+    h2 { margin: 24px 0 12px; font-size: 20px; color: #fff; }
+    table {
+      width: 100%; border-collapse: collapse; background: var(--panel-2); border: 1px solid var(--line);
+      border-radius: 14px; overflow: hidden; margin-bottom: 18px;
+    }
+    th, td { border-bottom: 1px solid var(--line); padding: 10px 10px; text-align: left; vertical-align: top; }
+    th { background: var(--panel); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: #cbd5e1; }
+    tfoot td { font-weight: 800; background: #1f2937; }
+    .r { text-align: right; }
+    .statement {
+      margin: 0 0 18px; padding: 18px; border: 1px solid var(--line); border-radius: 16px; background: #0b1220;
+      break-inside: avoid; page-break-inside: avoid;
+    }
+    .statement-head { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; flex-wrap:wrap; margin-bottom:14px; }
+    .statement-kicker { text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-size: 12px; font-weight: 700; }
+    .statement h3 { margin: 4px 0 0; font-size: 22px; }
+    .statement-total { padding: 12px 14px; border-radius: 14px; background: #111827; border: 1px solid var(--line); text-align: right; }
+    .statement-total strong { display: block; font-size: 24px; margin-top: 4px; color: #fff; }
+    .statement-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+    .statement-item { padding: 14px; border-radius: 14px; border: 1px solid var(--line); background: #111827; color: #e5e7eb; }
+    .statement-item span { display:block; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin-bottom: 6px; }
+    .statement-item strong { display:block; font-size: 22px; color:#fff; }
+    .statement-item small { display:block; margin-top:6px; color:#cbd5e1; line-height:1.45; }
+    .statement-item ul { margin: 8px 0 0 18px; padding: 0; }
+    .statement-item li { margin: 2px 0; }
+    .statement-alert { border-color:#92400e; background:#1f1308; }
+    .statement-net { border-color:#14532d; background:#0d1f17; }
+    .download-group { display:flex; gap:10px; flex-wrap:wrap; margin:16px 0 4px; }
+    .download-group a { background: var(--accent); }
+    .download-group a.secondary { background: var(--accent-2); }
+    .pill-row { display:flex; gap:10px; flex-wrap:wrap; }
+    .pill { padding:6px 10px; border-radius:999px; border:1px solid var(--line); background:#1f2937; color:#cbd5e1; font-size:12px; font-weight:700; }
+    .footer-note { color: var(--muted); line-height: 1.6; }
+    .link-list { padding-left: 18px; }
+    .link-list a { color: var(--blue); font-weight: 700; }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+</head>
+<body>
+  <div class="login-shell" id="login-shell">
+    <form class="login-card" id="login-form">
+      <img class="login-logo" src="./assets/gpl-logo.jpg" alt="Global Pack Logistics logo" />
+      <h2>Credential Login</h2>
+      <p>Enter your access details to open the Global Pack Logistics portal.</p>
+      <label for="login-user">Username</label>
+      <input id="login-user" autocomplete="username" required />
+      <label for="login-pass">Password</label>
+      <input id="login-pass" type="password" autocomplete="current-password" required />
+      <button type="submit">Continue</button>
+      <div class="login-note" id="login-status">Front-end login screen only.</div>
+    </form>
+  </div>
+  <main>
+    <header>
+      <div class="logo-wrap"><img class="logo-mark" src="./assets/gpl-logo.jpg" alt="Global Pack Logistics logo" /></div>
+      <h1>Global Pack Logistics Summary Runner</h1>
+      <p class="sub">Summary mode template for Global Pack Logistics. The warehouse and payment rules are provisional Lluberes template defaults pending GPL configuration. The browser processes the workbook locally so Cloudflare can host the app shell.</p>
+      <div class="badges">
+        <span class="badge">Template warehouse: EWR</span>
+        <span class="badge">Formats: HTML + Excel</span>
+        <span class="badge">Browser-side processing</span>
+        <span class="badge">Customer since: configure</span>
+      </div>
+    </header>
+
+    <section class="panel">
+      <form id="runner">
+        <div class="form-grid">
+          <div>
+            <label for="rule-source">Payment Rules Source</label>
+            <select id="rule-source" name="RuleSource">
+              <option value="Company" selected>Excel / Company</option>
+              <option value="Manual">Manual</option>
+            </select>
+          </div>
+          <div>
+            <label for="warehouse">Warehouse</label>
+            <select id="warehouse" name="Warehouse" disabled>
+              <option value="EWR" selected>EWR</option>
+            </select>
+          </div>
+          <div class="full">
+            <label for="excel">Excel workbook</label>
+            <input id="excel" name="excel" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required />
+          </div>
+        </div>
+        <div class="actions">
+          <button id="generate" type="submit">Generate Global Pack Logistics Summary</button>
+          <a class="link-btn secondary" id="download-summary" href="#" download style="display:none">Download Summary XLSX</a>
+          <a class="link-btn secondary" id="download-html" href="#" download style="display:none">Download Summary HTML</a>
+          <a class="link-btn secondary" id="download-zip" href="#" download style="display:none">Download Summary ZIP</a>
+        </div>
+        <div class="hint">
+          The source sheet is auto-detected by the columns <strong>DriverName</strong>, <strong>FinalStatus</strong>, and <strong>planDeliveryDate</strong>.
+          Claims are matched from a second sheet using <strong>Last delivery driver</strong> and <strong>Total Claim (Value,Del)</strong> (or similar names).
+        </div>
+        <div id="status"></div>
+      </form>
+    </section>
+
+    <section class="content" id="output" hidden>
+      <div class="pill-row" id="meta"></div>
+      <div id="summary-cards"></div>
+      <div id="download-links" class="download-group"></div>
+      <div id="report"></div>
+    </section>
+  </main>
+
+<script>
+(() => {
+  const el = (id) => document.getElementById(id);
+  const lockPortal = () => {
+    document.body.classList.add('locked');
+    el('login-shell').hidden = false;
+  };
+  const unlockPortal = () => {
+    document.body.classList.remove('locked');
+    el('login-shell').hidden = true;
+  };
+  el('login-form').addEventListener('submit', (event) => {
+    event.preventDefault();
+    const user = el('login-user').value.trim();
+    const pass = el('login-pass').value.trim();
+    if (!user || !pass) {
+      el('login-status').textContent = 'Enter both username and password.';
+      return;
+    }
+    unlockPortal();
+  });
+  const state = { summaryBlobUrl: null, htmlBlobUrl: null, zipBlobUrl: null };
+  const money = (v) => {
+    const n = Number(v || 0);
+    return `${n < 0 ? '-' : ''}$${Math.abs(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  };
+  const num = (v) => {
+    const n = Number(v || 0);
+    return Number.isInteger(n) ? String(n) : n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+  const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (ch) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  const norm = (value) => {
+    const text = String(value ?? '').trim().toLowerCase();
+    return text.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+  };
+  const cell = (row, idx0) => (row && row[idx0] !== undefined ? row[idx0] : '');
+  const setStatus = (kind, html) => { el('status').innerHTML = html ? `<div class="${kind}">${html}</div>` : ''; };
+  const resetDownloads = () => {
+    [state.summaryBlobUrl, state.htmlBlobUrl, state.zipBlobUrl].forEach((url) => url && URL.revokeObjectURL(url));
+    state.summaryBlobUrl = state.htmlBlobUrl = state.zipBlobUrl = null;
+    el('download-summary').style.display = 'none';
+    el('download-html').style.display = 'none';
+    el('download-zip').style.display = 'none';
+  };
+
+  const headerMapFor = (rows) => {
+    const header = (rows[0] || []).map((v) => String(v || '').trim());
+    const map = new Map();
+    header.forEach((name, idx) => { if (name) map.set(norm(name), idx); });
+    return map;
+  };
+
+  const generate = async (file, ruleSource, warehouse) => {
+    const bytes = await file.arrayBuffer();
+    const wb = XLSX.read(bytes, { type: 'array', cellDates: false, dense: true });
+    if (!wb.SheetNames || wb.SheetNames.length < 1) throw new Error('The workbook must contain at least one sheet.');
+
+    let sourceRows = null;
+    let sourceTitle = '';
+    let headerMap = null;
+    let headerRowIdx = null;
+    const required = new Set(['drivername', 'finalstatus', 'plandeliverydate']);
+    const preferred = new Set(['result', 'pld']);
+
+    const tryMatchSource = (rows) => {
+      for (let idx = 0; idx < Math.min(10, rows.length); idx++) {
+        const current = headerMapFor(rows.slice(idx));
+        if ([...required].every((key) => current.has(key))) {
+          return { rows, headerMap: current, headerRowIdx: idx };
+        }
+      }
+      return null;
+    };
+
+    for (const target of ['result', 'PLD']) {
+      for (const sheetName of wb.SheetNames) {
+        if (norm(sheetName) !== norm(target)) continue;
+        const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, defval: '' });
+        const matched = tryMatchSource(rows);
+        if (matched) {
+          sourceRows = rows;
+          headerMap = matched.headerMap;
+          headerRowIdx = matched.headerRowIdx;
+          sourceTitle = sheetName;
+          break;
+        }
+      }
+      if (sourceRows) break;
+    }
+    if (!sourceRows) {
+      for (const sheetName of wb.SheetNames) {
+        if (preferred.has(norm(sheetName))) continue;
+        const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, defval: '' });
+        const matched = tryMatchSource(rows);
+        if (matched) {
+          sourceRows = rows;
+          headerMap = matched.headerMap;
+          headerRowIdx = matched.headerRowIdx;
+          sourceTitle = sheetName;
+          break;
+        }
+      }
+    }
+    if (!sourceRows || !headerMap || headerRowIdx === null) {
+      throw new Error('The workbook must contain columns named DriverName, FinalStatus, and planDeliveryDate.');
+    }
+
+    const driverIdx = headerMap.get('drivername');
+    const statusIdx = headerMap.get('finalstatus');
+    const dayIdx = headerMap.get('plandeliverydate');
+
+    const defaultRate = 1.6;
+    const rateText = `2.00|Dileiry Lizardo`;
+    const rateMap = new Map();
+    rateText.split(/\r?\n/).forEach((line) => {
+      const trimmed = line.trim();
+      if (!trimmed || !trimmed.includes('|')) return;
+      const [rateTextPart, driverName] = trimmed.split('|', 2);
+      const rate = Number(rateTextPart);
+      rateMap.set(norm(driverName), Number.isFinite(rate) ? rate : 0);
+    });
+
+    const claimIndexAliasesDriver = ['Last delivery driver', 'Last assigned driver', 'DriverName', 'Driver Name', 'Driver', 'Courier'];
+    const claimIndexAliasesValue = ['Total Claim (Value,Del)', 'Total Claim Value Del', 'Total Claim', 'Claim Amount', 'Penalty Amount'];
+
+    let claimRows = null;
+    let claimDriverIdx = null;
+    let claimValueIdx = null;
+    let claimSourceTitle = '';
+    for (const sheetName of wb.SheetNames) {
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, defval: '' });
+      if (rows.length < 2) continue;
+      const map = headerMapFor(rows);
+      const findIdx = (cands) => cands.map((c) => map.get(norm(c))).find((idx) => idx !== undefined);
+      const d = findIdx(ruleSource === 'Manual' ? ['Name', 'DriverName', 'Driver Name', 'Driver', 'Courier'] : claimIndexAliasesDriver);
+      const v = findIdx(ruleSource === 'Manual' ? ['Total', 'Claim Amount', 'Penalty Amount'] : claimIndexAliasesValue);
+      if (d === undefined || v === undefined) continue;
+      claimRows = rows;
+      claimDriverIdx = d;
+      claimValueIdx = v;
+      claimSourceTitle = sheetName;
+      break;
+    }
+
+    const claimMap = new Map();
+    const claimDisplayNames = new Map();
+    if (claimRows) {
+      for (const row of claimRows.slice(1)) {
+        const driver = String(cell(row, claimDriverIdx) || '').trim();
+        if (!driver) continue;
+        const amount = Math.abs(Number(cell(row, claimValueIdx) || 0));
+        if (!amount) continue;
+        const key = norm(driver);
+        let display = driver.replace(/\s+/g, ' ').trim();
+        if (!rateMap.has(key)) display = `${display} - New Driver`;
+        if (!claimDisplayNames.has(key)) claimDisplayNames.set(key, display);
+        claimMap.set(key, (claimMap.get(key) || 0) - amount);
+      }
+    }
+
+    const grouped = new Map();
+    const order = { Delivered: [], 'Failed Attempt': [], 'Out for delivery': [], 'Returned sort Center': [], Blanks: [] };
+    const statusLookup = {
+      'delivered': 'Delivered',
+      'failed attempt': 'Failed Attempt',
+      'out for delivery': 'Out for delivery',
+      'returned sort center': 'Returned sort Center',
+      'returned sort centre': 'Returned sort Center',
+      'blanks': 'Blanks',
+    };
+    let ignoredRows = 0;
+    let deliveredDriverTotal = 0;
+    let claimsGrandTotal = 0;
+    let totalPackages = 0;
+    const uniqueDrivers = new Set();
+
+    const ensureRec = (status, key, driver) => {
+      if (!grouped.has(status)) grouped.set(status, new Map());
+      const map = grouped.get(status);
+      if (!map.has(key)) {
+        const displayDriver = rateMap.has(key) ? driver : `${driver} - New Driver`;
+        map.set(key, { DriverName: displayDriver, PackageQty: 0, Rate: rateMap.get(key) ?? defaultRate, Discount: 0, Claims: 0, TotalDriverPayment: 0, DaysWorked: new Set() });
+        order[status].push(key);
+      }
+      return map.get(key);
+    };
+
+    for (const row of sourceRows.slice(headerRowIdx + 1)) {
+      const driver = String(cell(row, driverIdx) || '').trim();
+      const statusRaw = String(cell(row, statusIdx) || '').trim();
+      if (!driver) continue;
+      let statusNorm = norm(statusRaw);
+      let status = statusLookup[statusNorm];
+      if (!status) {
+        if (!statusRaw) status = 'Blanks';
+        else { ignoredRows += 1; continue; }
+      }
+      const key = norm(driver);
+      const displayDriver = driver.replace(/\s+/g, ' ').trim();
+      const rec = ensureRec(status, key, displayDriver);
+      rec.PackageQty += 1;
+      rec.DaysWorked.add(String(cell(row, dayIdx) || '').trim().toLowerCase().replace(/\s+/g, ' '));
+      uniqueDrivers.add(key);
+    }
+
+    const statusRows = { Delivered: [], 'Failed Attempt': [], 'Out for delivery': [], 'Returned sort Center': [], Blanks: [] };
+    const statusTotals = {};
+    for (const status of Object.keys(statusRows)) {
+      const map = grouped.get(status) || new Map();
+      const keys = status === 'Delivered' ? [...order[status]].sort((a, b) => String(map.get(a)?.DriverName || '').localeCompare(String(map.get(b)?.DriverName || ''))) : order[status];
+      const totals = { PackageQty: 0, Rate: 0, Discount: 0, Claims: 0, TotalDriverPayment: 0 };
+      for (const key of keys) {
+        const rec = map.get(key);
+        if (!rec) continue;
+        const packageQty = Number(rec.PackageQty || 0);
+        const rate = Number(rec.Rate || 0);
+        const discount = status === 'Delivered' ? -60 : 0;
+        const claims = status === 'Delivered' ? Number(claimMap.get(key) || 0) : 0;
+        const totalPayment = status === 'Delivered' ? packageQty * rate + discount + claims : 0;
+        const row = {
+          DriverName: rec.DriverName,
+          PackageQty: packageQty,
+          Rate: rate,
+          Discount: discount,
+          Claims: claims,
+          TotalDriverPayment: totalPayment,
+          DaysWorked: rec.DaysWorked.size,
+        };
+        statusRows[status].push(row);
+        totals.PackageQty += packageQty;
+        totals.Rate += rate;
+        totals.Discount += discount;
+        totals.Claims += claims;
+        totals.TotalDriverPayment += totalPayment;
+      }
+      statusTotals[status] = totals;
+      totalPackages += totals.PackageQty;
+      if (status === 'Delivered') {
+        deliveredDriverTotal = totals.TotalDriverPayment;
+        claimsGrandTotal = totals.Claims;
+      }
+    }
+
+    const claimOnlyRows = [];
+    let claimOnlyTotal = 0;
+    [...claimMap.entries()].sort((a, b) => String(claimDisplayNames.get(a[0]) || a[0]).localeCompare(String(claimDisplayNames.get(b[0]) || b[0]))).forEach(([key, amount]) => {
+      if (uniqueDrivers.has(key)) return;
+      const display = claimDisplayNames.get(key) || key;
+      claimOnlyRows.push({ DriverName: display, Claims: amount });
+      claimOnlyTotal += amount;
+    });
+
+    const grandTotal = deliveredDriverTotal + claimsGrandTotal;
+
+    const moneyFmt = money;
+    const numFmt = num;
+    const sectionTableHtml = (status, rows, totals) => {
+      const deliveredOnly = status === 'Delivered';
+      if (deliveredOnly) {
+        const body = rows.map((r) => `<tr><td>${esc(r.DriverName)}</td><td class='r'>${numFmt(r.PackageQty)}</td><td class='r'>${moneyFmt(r.Rate)}</td><td class='r'>${moneyFmt(r.Discount)}</td><td class='r'>${moneyFmt(r.Claims)}</td><td class='r'>${moneyFmt(r.TotalDriverPayment)}</td></tr>`).join('') || "<tr><td colspan='6'>No rows found.</td></tr>";
+        return `<section class='block'><div class='section-head'><h2>${esc(status)}</h2><p>Days worked is counted from distinct <code>planDeliveryDate</code> values. Only <strong>Delivered</strong> rows are payable for now.</p></div><table><thead><tr><th>DriverName</th><th class='r'>Package Qty</th><th class='r'>Rate</th><th class='r'>Discount</th><th class='r'>Claims</th><th class='r'>Total Driver Payment</th></tr></thead><tbody>${body}</tbody><tfoot><tr><td>Total</td><td class='r'>${numFmt(totals.PackageQty)}</td><td class='r'>${moneyFmt(totals.Rate)}</td><td class='r'>${moneyFmt(totals.Discount)}</td><td class='r'>${moneyFmt(totals.Claims)}</td><td class='r'>${moneyFmt(totals.TotalDriverPayment)}</td></tr></tfoot></table></section>`;
+      }
+      const body = rows.map((r) => `<tr><td>${esc(r.DriverName)}</td><td class='r'>${numFmt(r.PackageQty)}</td></tr>`).join('') || "<tr><td colspan='2'>No rows found.</td></tr>";
+      return `<section class='block compact'><div class='section-head'><h2>${esc(status)}</h2><p>Not payable.</p></div><table><thead><tr><th>DriverName</th><th class='r'>Package Qty</th></tr></thead><tbody>${body}</tbody><tfoot><tr><td>Total</td><td class='r'>${numFmt(totals.PackageQty)}</td></tr></tfoot></table></section>`;
+    };
+
+    const buildSummaryWorkbook = () => {
+      const wb = XLSX.utils.book_new();
+      const summaryRows = [
+        ['Global Pack Logistics Summary'],
+        ['Warehouse', warehouse],
+        ['Workbook', file.name],
+        ['Source sheet', sourceTitle],
+        ['Claims source sheet', claimSourceTitle || ''],
+        ['Rule source', ruleSource],
+        ['Drivers', uniqueDrivers.size],
+        ['Total Packages', totalPackages],
+        ['Driver Grand Total Payout', deliveredDriverTotal],
+        ['Claims Grand Total Payout', claimsGrandTotal],
+        ['Claims Only Drivers', claimOnlyRows.length],
+        ['Claims Only Total', claimOnlyTotal],
+        ['Ignored Rows', ignoredRows],
+        [],
+        ['Status', 'DriverName', 'Package Qty', 'Rate', 'Discount', 'Claims', 'Total Driver Payment', 'Days Worked'],
+      ];
+      const appendRows = (status) => {
+        statusRows[status].forEach((r) => summaryRows.push([status, r.DriverName, Number(r.PackageQty), Number(r.Rate), Number(r.Discount), Number(r.Claims), Number(r.TotalDriverPayment), Number(r.DaysWorked)]));
+      };
+      ['Delivered', 'Failed Attempt', 'Out for delivery', 'Returned sort Center', 'Blanks'].forEach(appendRows);
+      summaryRows.push(['Grand Total', '', '', '', '', '', Number(grandTotal), '']);
+      const claimsRows = [
+        ['Claims / Adjustments'],
+        ['Claims source sheet', claimSourceTitle || ''],
+        ['Workbook', file.name],
+        [],
+        ['Driver Name', 'Claims'],
+        ...claimOnlyRows.map((r) => [r.DriverName, Number(r.Claims)]),
+        ['Total', Number(claimOnlyTotal)],
+      ];
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summaryRows), 'Summary');
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(claimsRows), 'Claims');
+      return XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    };
+
+    const buildHtmlReport = () => {
+      const summaryCards = [
+        ['Drivers', uniqueDrivers.size],
+        ['Total Packages', totalPackages],
+        ['Driver Grand Total Payout', deliveredDriverTotal],
+        ['Claims Grand Total Payout', claimsGrandTotal],
+        ['Claims Only Drivers', claimOnlyRows.length],
+      ].map(([label, value]) => `<div class='card'><div class='label-small'>${esc(label)}</div><div class='value'>${typeof value === 'number' ? (String(value).includes('.') ? numFmt(value) : String(value)) : esc(value)}</div></div>`).join('');
+
+      const claimHtml = claimOnlyRows.map((r) => `<tr><td>${esc(r.DriverName)}</td><td class='r'>${moneyFmt(r.Claims)}</td></tr>`).join('') || "<tr><td colspan='2'>No unmatched claim-only drivers.</td></tr>";
+
+      const statusHtml = ['Delivered', 'Failed Attempt', 'Out for delivery', 'Returned sort Center', 'Blanks'].map((status) => sectionTableHtml(status, statusRows[status], statusTotals[status])).join('');
+
+      const summarySection = `<div class='summary-grid'>${summaryCards}</div>`;
+      const claimRowsPreview = claimOnlyRows.map((r) => `<li>${esc(r.DriverName)} — ${moneyFmt(r.Claims)}</li>`).join('') || '<li>No claim-only drivers</li>';
+
+      return `<!doctype html>
+<html lang='en'>
+<head>
+  <meta charset='utf-8' />
+  <meta name='viewport' content='width=device-width, initial-scale=1' />
+  <title>Global Pack Logistics Summary Report</title>
+  <meta name='robots' content='noindex,nofollow' />
+  <style>
+    body{font-family:Arial,sans-serif;background:#0f172a;color:#e5e7eb;margin:0;padding:24px}
+    main{max-width:1200px;margin:0 auto;background:#111827;border:1px solid #374151;border-radius:18px;box-shadow:0 20px 60px rgba(15,23,42,.28);overflow:hidden}
+    header{padding:22px 24px;background:linear-gradient(135deg,#07111f,#173b6a);color:#fff}
+    h1{margin:0 0 6px;font-size:34px;letter-spacing:-.5px}
+    .sub{margin:0;color:#cbd5e1;line-height:1.55}
+    .meta{padding:16px 24px;background:#1f2937;border-bottom:1px solid #374151;color:#fde68a;font-weight:700}
+    .summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;padding:18px 24px 0}
+    .card{border:1px solid #374151;border-radius:14px;padding:14px;background:#0b1220}
+    .label-small{font-size:12px;text-transform:uppercase;color:#94a3b8;letter-spacing:.06em}
+    .value{font-size:22px;font-weight:800;margin-top:6px;color:#fff}
+    h2{margin:24px 24px 12px;font-size:20px;color:#fff}
+    .block{margin:0 24px 18px;padding:18px;border:1px solid #374151;border-radius:16px;background:#0b1220;break-inside:avoid;page-break-inside:avoid}
+    .block.compact{opacity:.92}
+    .section-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+    .section-head h2{margin:0;font-size:22px}
+    .section-head p{margin:0;color:#cbd5e1}
+    table{width:100%;border-collapse:collapse;background:#0b1220;border:1px solid #374151;border-radius:14px;overflow:hidden;margin-bottom:18px}
+    th,td{border-bottom:1px solid #374151;padding:10px 10px;text-align:left;vertical-align:top}
+    th{background:#111827;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:#cbd5e1}
+    tfoot td{font-weight:800;background:#1f2937}
+    .r{text-align:right}
+    .note{padding:0 24px 24px;color:#94a3b8;line-height:1.6}
+    .download-group{padding:0 24px 8px;display:flex;gap:10px;flex-wrap:wrap}
+    a{display:inline-block;padding:10px 14px;border-radius:10px;background:#d71920;color:#fff;font-weight:800;text-decoration:none}
+    a.secondary{background:#1f2937}
+    .link-list{padding-left:20px}
+    .link-list a{background:none;color:#93c5fd;padding:0;text-decoration:underline}
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Global Pack Logistics Summary Report</h1>
+      <p class='sub'>Warehouse: <strong>${esc(warehouse)}</strong> · Workbook: <strong>${esc(file.name)}</strong> · Source sheet: <strong>${esc(sourceTitle)}</strong></p>
+    </header>
+    <div class='meta'>Generated in the browser. Download the Excel workbook, HTML summary, or ZIP below.</div>
+    ${summarySection}
+    <div class='download-group'>
+      <a href='#' download='Global Pack Logistics_Summary.xlsx'>Download Summary XLSX</a>
+      <a href='#' class='secondary' download='Global Pack Logistics_Summary.html'>Download Summary HTML</a>
+      <a href='#' class='secondary' download='Global Pack Logistics_Summary.zip'>Download Summary ZIP</a>
+    </div>
+    <h2>Claims Imported From Claim Sheet</h2>
+    <table>
+      <thead><tr><th>Driver Name</th><th class='r'>Claims</th></tr></thead>
+      <tbody>${claimHtml}</tbody>
+    </table>
+    <h2>Claim-Only Drivers</h2>
+    <div class='note'><ul class='link-list'>${claimRowsPreview}</ul></div>
+    <h2>Detailed Sections</h2>
+    ${statusHtml}
+  </main>
+</body>
+</html>`;
+    };
+
+    const summaryWorkbookArray = buildSummaryWorkbook();
+    const summaryHtml = buildHtmlReport();
+    const zip = new JSZip();
+    zip.file('Global Pack Logistics_Summary.html', summaryHtml);
+    zip.file('Summary.xlsx', summaryWorkbookArray);
+    zip.file('README.txt', 'Browser-generated Global Pack Logistics summary bundle.');
+    const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+    return { summaryWorkbookArray, summaryHtml, zipBlob, sourceTitle, claimSourceTitle, uniqueDrivers: uniqueDrivers.size, totalPackages, deliveredDriverTotal, claimsGrandTotal, claimOnlyRows, claimOnlyTotal, grandTotal, statusRows, statusTotals, ignoredRows };
+  };
+
+  el('runner').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    resetDownloads();
+    setStatus('', '');
+
+    const file = el('excel').files && el('excel').files[0];
+    if (!file) { setStatus('error', 'Please choose an Excel workbook first.'); return; }
+    if (!/\.xlsx$/i.test(file.name)) { setStatus('error', 'Only .xlsx files are accepted.'); return; }
+
+    const button = el('generate');
+    button.disabled = true;
+    button.classList.add('pending');
+    button.innerHTML = 'Generating<span class="spinner" aria-hidden="true"></span>';
+    setStatus('warnbox', 'Processing workbook in the browser...');
+
+    try {
+      const ruleSource = el('rule-source').value || 'Company';
+      const warehouse = 'EWR';
+      const data = await generate(file, ruleSource, warehouse);
+      const summaryBlob = new Blob([data.summaryWorkbookArray], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const htmlBlob = new Blob([data.summaryHtml], { type: 'text/html;charset=utf-8' });
+      state.summaryBlobUrl = URL.createObjectURL(summaryBlob);
+      state.htmlBlobUrl = URL.createObjectURL(htmlBlob);
+      state.zipBlobUrl = URL.createObjectURL(data.zipBlob);
+      el('download-summary').href = state.summaryBlobUrl;
+      el('download-html').href = state.htmlBlobUrl;
+      el('download-zip').href = state.zipBlobUrl;
+      el('download-summary').download = 'Global Pack Logistics_Summary.xlsx';
+      el('download-html').download = 'Global Pack Logistics_Summary.html';
+      el('download-zip').download = 'Global Pack Logistics_Summary.zip';
+      el('download-summary').style.display = 'inline-block';
+      el('download-html').style.display = 'inline-block';
+      el('download-zip').style.display = 'inline-block';
+
+      el('output').hidden = false;
+      el('meta').innerHTML = [
+        `<span class='pill'>Workbook: ${esc(file.name)}</span>`,
+        `<span class='pill'>Rule Source: ${esc(ruleSource)}</span>`,
+        `<span class='pill'>Warehouse: ${esc(warehouse)}</span>`,
+        `<span class='pill'>Drivers: ${data.uniqueDrivers}</span>`,
+      ].join('');
+      el('summary-cards').innerHTML = `
+        <div class='summary-grid'>
+          <div class='card'><div class='label-small'>Drivers</div><div class='value'>${data.uniqueDrivers}</div></div>
+          <div class='card'><div class='label-small'>Total Packages</div><div class='value'>${num(data.totalPackages)}</div></div>
+          <div class='card'><div class='label-small'>Driver Grand Total Payout</div><div class='value'>${money(data.deliveredDriverTotal)}</div></div>
+          <div class='card'><div class='label-small'>Claims Grand Total Payout</div><div class='value'>${money(data.claimsGrandTotal)}</div></div>
+          <div class='card'><div class='label-small'>Claims Only Drivers</div><div class='value'>${data.claimOnlyRows.length}</div></div>
+        </div>`;
+      const statusCards = ['Delivered', 'Failed Attempt', 'Out for delivery', 'Returned sort Center', 'Blanks'].map((status) => {
+        const t = data.statusTotals[status];
+        return `<section class='statement'><div class='statement-head'><div><div class='statement-kicker'>${esc(status)}</div><h3>${esc(status)}</h3></div><div class='statement-total'>Package Qty<br><strong>${num(t.PackageQty)}</strong></div></div><div class='statement-grid'>${status === 'Delivered' ? `
+          <div class='statement-item'><span>Package Qty</span><strong>${num(t.PackageQty)}</strong></div>
+          <div class='statement-item'><span>Rate Total</span><strong>${money(t.Rate)}</strong></div>
+          <div class='statement-item'><span>Discount</span><strong>${money(t.Discount)}</strong></div>
+          <div class='statement-item'><span>Claims</span><strong>${money(t.Claims)}</strong></div>
+          <div class='statement-item statement-net'><span>Total Driver Payment</span><strong>${money(t.TotalDriverPayment)}</strong></div>` : `
+          <div class='statement-item'><span>Package Qty</span><strong>${num(t.PackageQty)}</strong></div>`}</div></section>`;
+      }).join('');
+      el('report').innerHTML = `
+        <h2>Claim Summary</h2>
+        <table>
+          <thead><tr><th>Driver Name</th><th class='r'>Claims</th></tr></thead>
+          <tbody>${data.claimOnlyRows.length ? data.claimOnlyRows.map((r) => `<tr><td>${esc(r.DriverName)}</td><td class='r'>${money(r.Claims)}</td></tr>`).join('') : "<tr><td colspan='2'>No claim-only drivers</td></tr>"}</tbody>
+          <tfoot><tr><td>Total</td><td class='r'>${money(data.claimOnlyTotal)}</td></tr></tfoot>
+        </table>
+        <h2>Detailed Status Sections</h2>
+        ${statusCards}
+      `;
+      setStatus('success', `Generated Global Pack Logistics summary successfully in the browser.`);
+    } catch (err) {
+      console.error(err);
+      setStatus('error', esc(err && err.message ? err.message : String(err)));
+      el('output').hidden = true;
+    } finally {
+      button.disabled = false;
+      button.classList.remove('pending');
+      button.innerHTML = 'Generate Global Pack Logistics Summary';
+    }
+  });
+})();
+</script>
+</body>
+</html>
