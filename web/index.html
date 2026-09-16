@@ -514,28 +514,15 @@
 
     const buildSummaryWorkbook = () => {
       const wb = XLSX.utils.book_new();
-      const summaryRows = [
-        ['Global Pack Logistics Summary'],
-        ['Warehouse', warehouse],
-        ['Workbook', file.name],
-        ['Source sheet', sourceTitle],
-        ['Claims source sheet', claimSourceTitle || ''],
-        ['Rule source', ruleSource],
-        ['Drivers', uniqueDrivers.size],
-        ['Total Packages', totalPackages],
-        ['Driver Grand Total Payout', deliveredDriverTotal],
-        ['Claims Grand Total Payout', claimsGrandTotal],
-        ['Claims Only Drivers', claimOnlyRows.length],
-        ['Claims Only Total', claimOnlyTotal],
-        ['Ignored Rows', ignoredRows],
-        [],
-        ['Status', 'DriverName', 'Package Qty', 'Rate', 'Claims', 'Total Driver Payment', 'Days Worked'],
-      ];
-      const appendRows = (status) => {
-        statusRows[status].forEach((r) => summaryRows.push([status, r.DriverName, Number(r.PackageQty), Number(r.Rate), Number(r.Claims), Number(r.TotalDriverPayment), Number(r.DaysWorked)]));
-      };
-      ['Delivered', 'Failed Attempt', 'Out for delivery', 'Returned sort Center', 'Blanks'].forEach(appendRows);
-      summaryRows.push(['Grand Total', '', '', '', '', '', Number(grandTotal), '']);
+      const deliveredRows = statusRows.Delivered || [];
+      const summaryRows = [['DriverName', '0.5 Package count', '1.6 package count', 'total packages delivered', 'claims', 'Days worked', 'Total Driver Payment']];
+      const driverSummaryRows = deliveredRows.map((r) => {
+        const package05 = (r.Deliveries || []).filter((d) => Number(d.Price) === 0.5).length;
+        const package16 = (r.Deliveries || []).filter((d) => Number(d.Price) === 1.6).length;
+        return [r.DriverName, package05, package16, Number(r.PackageQty), Number(r.Claims), Number(r.DaysWorked), Number(r.TotalDriverPayment)];
+      });
+      summaryRows.push(...driverSummaryRows);
+      summaryRows.push(['Grand Total', driverSummaryRows.reduce((sum, r) => sum + Number(r[1] || 0), 0), driverSummaryRows.reduce((sum, r) => sum + Number(r[2] || 0), 0), driverSummaryRows.reduce((sum, r) => sum + Number(r[3] || 0), 0), driverSummaryRows.reduce((sum, r) => sum + Number(r[4] || 0), 0), driverSummaryRows.reduce((sum, r) => sum + Number(r[5] || 0), 0), driverSummaryRows.reduce((sum, r) => sum + Number(r[6] || 0), 0)]);
       const claimsRows = [
         ['Claims / Adjustments'],
         ['Claims source sheet', claimSourceTitle || ''],
