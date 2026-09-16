@@ -170,7 +170,7 @@
     <header>
       <div class="logo-wrap"><img class="logo-mark" src="./assets/gpl-logo.jpg" alt="Global Pack Logistics logo" /></div>
       <h1>Global Pack Logistics Summary Runner</h1>
-      <p class="sub">Summary and driver statement portal for Global Pack Logistics. Delivered packages are paid at $1.60 each, with claims kept as separate deductions. The browser processes the workbook locally so Cloudflare can host the app shell.</p>
+      <p class="sub">Summary and driver statement portal for Global Pack Logistics. GPL driver pay is calculated from the Detail1 Rate column: Rate 1 or less pays $0.50, and Rate 2.5 or more pays $1.60. The browser processes the workbook locally so Cloudflare can host the app shell.</p>
       <div class="badges">
         <span class="badge">Template warehouse: Tallahassee</span>
         <span class="badge">Formats: HTML + Excel</span>
@@ -214,7 +214,7 @@
           <a class="link-btn secondary" id="download-zip" href="#" download style="display:none">Download Summary ZIP</a>
         </div>
         <div class="hint">
-          The source sheet is auto-detected by the columns <strong>DriverName</strong>, <strong>FinalStatus</strong>, and <strong>planDeliveryDate</strong>.
+          The GPL source sheet is <strong>Detail1</strong> with <strong>DriverName</strong>, <strong>TrackingNo</strong>, <strong>ZipCode</strong>, <strong>CompleteTime</strong>, and <strong>Rate</strong>. Driver names are normalized so multiple spaces do not create duplicate drivers.
           Claims are matched from a second sheet using <strong>Last delivery driver</strong> and <strong>Total Claim (Value,Del)</strong> (or similar names).
         </div>
         <div id="status"></div>
@@ -288,6 +288,7 @@
 
     let sourceRows = null;
     let sourceTitle = '';
+    let detailMode = false;
     let headerMap = null;
     let headerRowIdx = null;
     const required = new Set(['drivername', 'finalstatus', 'plandeliverydate']);
@@ -303,7 +304,21 @@
       return null;
     };
 
-    for (const target of ['result', 'PLD']) {
+    for (const sheetName of wb.SheetNames) {
+      if (norm(sheetName) !== 'detail1') continue;
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, defval: '' });
+      const current = headerMapFor(rows);
+      const detailRequired = ['drivername', 'trackingno', 'zipcode', 'completetime', 'rate'];
+      if (detailRequired.every((key) => current.has(key))) {
+        sourceRows = rows;
+        headerMap = current;
+        headerRowIdx = 0;
+        sourceTitle = sheetName;
+        detailMode = true;
+        break;
+      }
+    }
+    if (!sourceRows) for (const target of ['result', 'PLD']) {
       for (const sheetName of wb.SheetNames) {
         if (norm(sheetName) !== norm(target)) continue;
         const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, defval: '' });
@@ -333,7 +348,7 @@
       }
     }
     if (!sourceRows || !headerMap || headerRowIdx === null) {
-      throw new Error('The workbook must contain columns named DriverName, FinalStatus, and planDeliveryDate.');
+      throw new Error('The workbook must contain a Detail1 sheet with DriverName, TrackingNo, ZipCode, CompleteTime, and Rate.');
     }
 
     const driverIdx = headerMap.get('drivername');
@@ -341,6 +356,9 @@
     const dayIdx = headerMap.get('plandeliverydate');
     const trackingIdx = ['trackingno', 'tracking no', 'tracking number', 'tracking #', 'tracking id', 'tracking'].map(norm).map((name) => headerMap.get(name)).find((idx) => idx !== undefined);
     const addressIdx = ['address', 'delivery address', 'dropoff address', 'customer address', 'deliveryaddress', '地址'].map(norm).map((name) => headerMap.get(name)).find((idx) => idx !== undefined);
+    const zipIdx = detailMode ? headerMap.get('zipcode') : undefined;
+    const completeIdx = detailMode ? headerMap.get('completetime') : undefined;
+    const rateIdx = detailMode ? headerMap.get('rate') : undefined;
 
     const defaultRate = 1.6;
     const rateText = '';
@@ -411,7 +429,7 @@
       const map = grouped.get(status);
       if (!map.has(key)) {
         const displayDriver = driver;
-        map.set(key, { DriverName: displayDriver, PackageQty: 0, Rate: rateMap.get(key) ?? defaultRate, Claims: 0, TotalDriverPayment: 0, DaysWorked: new Set(), Deliveries: [] });
+        map.set(key, { DriverName: displayDriver, PackageQty: 0, Rate: 0, Claims: 0, TotalDriverPayment: 0, DaysWorked: new Set(), Deliveries: [] });
         order[status].push(key);
       }
       return map.get(key);
@@ -430,9 +448,14 @@
       const key = norm(driver);
       const displayDriver = driver.replace(/\s+/g, ' ').trim();
       const rec = ensureRec(status, key, displayDriver);
+      const sourceRate = detailMode ? Number(cell(row, rateIdx)) : null;
+      const driverPay = detailMode ? (sourceRate <= 1 ? 0.5 : sourceRate >= 2.5 ? 1.6 : null) : null;
+      if (detailMode && !Number.isFinite(sourceRate)) throw new Error(`Invalid Rate for ${displayDriver}: ${cell(row, rateIdx)}`);
+      if (detailMode && driverPay === null) throw new Error(`Unsupported Rate ${sourceRate} for ${displayDriver}. Expected 1 or 2.5.`);
       rec.PackageQty += 1;
+      if (detailMode) { rec.Rate += sourceRate; rec.TotalDriverPayment += driverPay; }
       rec.DaysWorked.add(String(cell(row, dayIdx) || '').trim().toLowerCase().replace(/\s+/g, ' '));
-      rec.Deliveries.push({ TrackingNo: String(trackingIdx === undefined ? '' : cell(row, trackingIdx) || '').trim(), Address: String(addressIdx === undefined ? '' : cell(row, addressIdx) || '').trim(), Status: statusRaw || status, Price: 1.6 });
+      rec.Deliveries.push({ TrackingNo: String(trackingIdx === undefined ? '' : cell(row, trackingIdx) || '').trim(), Address: String(addressIdx === undefined ? '' : cell(row, addressIdx) || '').trim(), ZipCode: detailMode ? String(cell(row, zipIdx) || '').trim() : '', CompleteTime: detailMode ? String(cell(row, completeIdx) || '').trim() : '', Status: statusRaw || status, Price: detailMode ? driverPay : 1.6 });
       uniqueDrivers.add(key);
     }
 
@@ -448,7 +471,7 @@
         const packageQty = Number(rec.PackageQty || 0);
         const rate = Number(rec.Rate || 0);
         const claims = status === 'Delivered' ? Number(claimMap.get(key) || 0) : 0;
-        const totalPayment = status === 'Delivered' ? packageQty * 1.6 + claims : 0;
+        const totalPayment = status === 'Delivered' ? (detailMode ? rec.TotalDriverPayment : packageQty * 1.6) + claims : 0;
         const row = {
           DriverName: rec.DriverName,
           PackageQty: packageQty,
@@ -489,7 +512,7 @@
       const deliveredOnly = status === 'Delivered';
       if (deliveredOnly) {
         const body = rows.map((r) => `<tr><td>${esc(r.DriverName)}</td><td class='r'>${num(r.PackageQty)}</td><td class='r'>${money(r.Rate)}</td><td class='r'>${money(r.Claims)}</td><td class='r'>${money(r.TotalDriverPayment)}</td></tr>`).join('') || "<tr><td colspan='5'>No rows found.</td></tr>";
-        return `<section class='block'><div class='section-head'><h2>${esc(status)}</h2><p>All delivered packages pay <strong>$1.60 each</strong>. Claims remain separate deductions. Days worked is counted from distinct <code>planDeliveryDate</code> values.</p></div><table><thead><tr><th>DriverName</th><th class='r'>Package Qty</th><th class='r'>Rate</th><th class='r'>Claims</th><th class='r'>Total Driver Payment</th></tr></thead><tbody>${body}</tbody><tfoot><tr><td>Total</td><td class='r'>${num(totals.PackageQty)}</td><td class='r'>${money(totals.Rate)}</td><td class='r'>${money(totals.Claims)}</td><td class='r'>${money(totals.TotalDriverPayment)}</td></tr></tfoot></table></section>`;
+        return `<section class='block'><div class='section-head'><h2>${esc(status)}</h2><p>GPL driver pay uses the Detail1 Rate: Rate 1 or less pays <strong>$0.50</strong>; Rate 2.5 or more pays <strong>$1.60</strong>. Claims remain separate deductions. Days worked is counted from distinct <code>planDeliveryDate</code> values when available.</p></div><table><thead><tr><th>DriverName</th><th class='r'>Package Qty</th><th class='r'>Rate</th><th class='r'>Claims</th><th class='r'>Total Driver Payment</th></tr></thead><tbody>${body}</tbody><tfoot><tr><td>Total</td><td class='r'>${num(totals.PackageQty)}</td><td class='r'>${money(totals.Rate)}</td><td class='r'>${money(totals.Claims)}</td><td class='r'>${money(totals.TotalDriverPayment)}</td></tr></tfoot></table></section>`;
       }
       const body = rows.map((r) => `<tr><td>${esc(r.DriverName)}</td><td class='r'>${num(r.PackageQty)}</td></tr>`).join('') || "<tr><td colspan='2'>No rows found.</td></tr>";
       return `<section class='block compact'><div class='section-head'><h2>${esc(status)}</h2><p>Not payable.</p></div><table><thead><tr><th>DriverName</th><th class='r'>Package Qty</th></tr></thead><tbody>${body}</tbody><tfoot><tr><td>Total</td><td class='r'>${num(totals.PackageQty)}</td></tr></tfoot></table></section>`;
@@ -647,7 +670,7 @@
         const deliveredRows = data.statusRows.Delivered || [];
         const statementHtml = (row) => `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>GPL Driver Statement - ${esc(row.DriverName)}</title><style>
-body{font-family:Arial,sans-serif;background:#eef5fb;color:#172b4d;margin:0;padding:24px}main{max-width:900px;margin:auto;background:#fff;border:1px solid #cbd9e8;border-radius:18px;overflow:hidden;box-shadow:0 12px 32px rgba(30,64,96,.14)}header{padding:24px;background:linear-gradient(135deg,#e5f0fa,#c7dcf0);text-align:center}header img{display:block;width:min(260px,75vw);height:auto;margin:0 auto 16px}h1{margin:0 0 8px;font-size:30px;color:#0d2a52}.sub{margin:0;color:#38516e;line-height:1.5}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;padding:24px}.card{border:1px solid #cbd9e8;border-radius:14px;padding:16px;background:#f8fbfe}.label{font-size:12px;text-transform:uppercase;color:#5f7690;letter-spacing:.06em}.value{font-size:22px;font-weight:800;margin-top:6px;color:#17345f}.net{border-color:#8fd0ab;background:#effaf3}.detail{padding:0 24px 24px}.detail h2{font-size:20px;color:#0d2a52;margin:0 0 10px}.detail table{width:100%;border-collapse:collapse;border:1px solid #cbd9e8;font-size:13px}.detail th,.detail td{padding:9px 10px;border-bottom:1px solid #dbe6f0;text-align:left;vertical-align:top}.detail th{background:#eaf3fb;color:#294766;text-transform:uppercase;font-size:11px;letter-spacing:.04em}.detail td:last-child,.detail th:last-child{text-align:right}.note{padding:0 24px 24px;color:#5f7690}</style></head><body><main><header><img src="https://whitehatdata.us/gpl/assets/gpl-logo.jpg" alt="Global Pack Logistics logo"><h1>Global Pack Logistics Driver Statement</h1><p class="sub">Driver: <strong>${esc(row.DriverName)}</strong> · Warehouse: <strong>${esc(warehouse)}</strong></p></header><section class="grid"><div class="card"><div class="label">Package Qty</div><div class="value">${num(row.PackageQty)}</div></div><div class="card"><div class="label">Rate Total</div><div class="value">${money(row.Rate)}</div></div><div class="card"><div class="label">Claims</div><div class="value">${money(row.Claims)}</div></div><div class="card"><div class="label">Days Worked</div><div class="value">${num(row.DaysWorked)}</div></div><div class="card net"><div class="label">Total Driver Payment</div><div class="value">${money(row.TotalDriverPayment)}</div></div></section><section class="detail"><h2>Package Details</h2><table><thead><tr><th>TrackingNo</th><th>Address</th><th>Status</th><th>Price per Package</th></tr></thead><tbody>${(row.Deliveries || []).map((d) => `<tr><td>${esc(d.TrackingNo || '—')}</td><td>${esc(d.Address || '—')}</td><td>${esc(d.Status || '—')}</td><td>${money(d.Price)}</td></tr>`).join('') || '<tr><td colspan="4">No package details found.</td></tr>'}</tbody></table></section><div class="note">Generated in the browser from the GPLApp workbook. Source sheet: ${esc(data.sourceTitle)}.</div></main></body></html>`;
+body{font-family:Arial,sans-serif;background:#eef5fb;color:#172b4d;margin:0;padding:24px}main{max-width:900px;margin:auto;background:#fff;border:1px solid #cbd9e8;border-radius:18px;overflow:hidden;box-shadow:0 12px 32px rgba(30,64,96,.14)}header{padding:24px;background:linear-gradient(135deg,#e5f0fa,#c7dcf0);text-align:center}header img{display:block;width:min(260px,75vw);height:auto;margin:0 auto 16px}h1{margin:0 0 8px;font-size:30px;color:#0d2a52}.sub{margin:0;color:#38516e;line-height:1.5}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;padding:24px}.card{border:1px solid #cbd9e8;border-radius:14px;padding:16px;background:#f8fbfe}.label{font-size:12px;text-transform:uppercase;color:#5f7690;letter-spacing:.06em}.value{font-size:22px;font-weight:800;margin-top:6px;color:#17345f}.net{border-color:#8fd0ab;background:#effaf3}.detail{padding:0 24px 24px}.detail h2{font-size:20px;color:#0d2a52;margin:0 0 10px}.detail table{width:100%;border-collapse:collapse;border:1px solid #cbd9e8;font-size:13px}.detail th,.detail td{padding:9px 10px;border-bottom:1px solid #dbe6f0;text-align:left;vertical-align:top}.detail th{background:#eaf3fb;color:#294766;text-transform:uppercase;font-size:11px;letter-spacing:.04em}.detail td:last-child,.detail th:last-child{text-align:right}.note{padding:0 24px 24px;color:#5f7690}</style></head><body><main><header><img src="https://whitehatdata.us/gpl/assets/gpl-logo.jpg" alt="Global Pack Logistics logo"><h1>Global Pack Logistics Driver Statement</h1><p class="sub">Driver: <strong>${esc(row.DriverName)}</strong> · Warehouse: <strong>${esc(warehouse)}</strong></p></header><section class="grid"><div class="card"><div class="label">Package Qty</div><div class="value">${num(row.PackageQty)}</div></div><div class="card"><div class="label">Rate Total</div><div class="value">${money(row.Rate)}</div></div><div class="card"><div class="label">Claims</div><div class="value">${money(row.Claims)}</div></div><div class="card"><div class="label">Days Worked</div><div class="value">${num(row.DaysWorked)}</div></div><div class="card net"><div class="label">Total Driver Payment</div><div class="value">${money(row.TotalDriverPayment)}</div></div></section><section class="detail"><h2>Package Details</h2><table><thead><tr><th>DriverName</th><th>TrackingNo</th><th>ZipCode</th><th>CompleteTime</th><th>Status</th><th>DriverPay</th></tr></thead><tbody>${(row.Deliveries || []).map((d) => `<tr><td>${esc(row.DriverName)}</td><td>${esc(d.TrackingNo || '—')}</td><td>${esc(d.ZipCode || '—')}</td><td>${esc(d.CompleteTime || '—')}</td><td>${esc(d.Status || '—')}</td><td>${money(d.Price)}</td></tr>`).join('') || '<tr><td colspan="6">No package details found.</td></tr>'}</tbody></table></section><div class="note">Generated in the browser from the GPLApp workbook. Source sheet: ${esc(data.sourceTitle)}.</div></main></body></html>`;
         const zip = new JSZip();
         deliveredRows.forEach((row, index) => {
           const safe = String(row.DriverName || `Driver_${index + 1}`).replace(/[^a-z0-9-_]+/gi, '_').replace(/_+/g, '_').replace(/^_|_$/g, '') || `Driver_${index + 1}`;
