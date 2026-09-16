@@ -170,7 +170,7 @@
     <header>
       <div class="logo-wrap"><img class="logo-mark" src="./assets/gpl-logo.jpg" alt="Global Pack Logistics logo" /></div>
       <h1>Global Pack Logistics Summary Runner</h1>
-      <p class="sub">Summary and driver statement portal for Global Pack Logistics. GPL driver pay is calculated from the Detail1 Rate column: Rate 1 or less pays $0.50, and Rate 2.5 or more pays $1.60. The browser processes the workbook locally so Cloudflare can host the app shell.</p>
+
       <div class="badges">
         <span class="badge">Template warehouse: Tallahassee</span>
         <span class="badge">Formats: HTML + Excel</span>
@@ -189,13 +189,7 @@
               <option value="Driver Statements">Driver Statements</option>
             </select>
           </div>
-          <div>
-            <label for="rule-source">Payment Rules Source</label>
-            <select id="rule-source" name="RuleSource">
-              <option value="Company" selected>Excel / Company</option>
-              <option value="Manual">Manual</option>
-            </select>
-          </div>
+
           <div>
             <label for="warehouse">Warehouse</label>
             <select id="warehouse" name="Warehouse" disabled>
@@ -663,7 +657,7 @@
 
     try {
       const mode = el('mode').value || 'Summary';
-      const ruleSource = el('rule-source').value || 'Company';
+      const ruleSource = 'Company';
       const warehouse = 'Tallahassee';
       const data = await generate(file, ruleSource, warehouse);
       if (mode === 'Driver Statements') {
