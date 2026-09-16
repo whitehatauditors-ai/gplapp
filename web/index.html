@@ -670,6 +670,7 @@ body{font-family:Arial,sans-serif;background:#eef5fb;color:#172b4d;margin:0;padd
         el('summary-cards').innerHTML = `<div class='summary-grid'><div class='card'><div class='label-small'>Driver Statements</div><div class='value'>${deliveredRows.length}</div></div><div class='card'><div class='label-small'>Total Packages</div><div class='value'>${num(data.totalPackages)}</div></div><div class='card'><div class='label-small'>Total Driver Payment</div><div class='value'>${money(data.deliveredDriverTotal)}</div></div></div>`;
         el('report').innerHTML = `<h2>Driver Statements</h2><div class='footer-note'>Each delivered driver has an individual GPL-branded HTML statement in the ZIP download.</div><div class='summary-grid'>${deliveredRows.map((row) => `<div class='card'><div class='label-small'>${esc(row.DriverName)}</div><div class='value'>${money(row.TotalDriverPayment)}</div></div>`).join('') || '<div class="card">No delivered driver statements found.</div>'}</div>`;
         setStatus('success', `Generated ${deliveredRows.length} Global Pack Logistics driver statements successfully in the browser.`);
+        setTimeout(() => el('download-zip').click(), 0);
         return;
       }
       const summaryBlob = new Blob([data.summaryWorkbookArray], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
@@ -723,6 +724,7 @@ body{font-family:Arial,sans-serif;background:#eef5fb;color:#172b4d;margin:0;padd
         ${statusCards}
       `;
       setStatus('success', `Generated Global Pack Logistics summary successfully in the browser.`);
+      setTimeout(() => el('download-summary').click(), 0);
     } catch (err) {
       console.error(err);
       setStatus('error', esc(err && err.message ? err.message : String(err)));
