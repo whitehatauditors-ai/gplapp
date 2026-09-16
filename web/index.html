@@ -665,7 +665,7 @@ body{font-family:Arial,sans-serif;background:#eef5fb;color:#172b4d;margin:0;padd
         el('download-zip').download = 'Global Pack Logistics_Driver_Statements.zip';
         el('download-zip').textContent = 'Download GPL Driver Statements ZIP';
         el('download-zip').style.display = deliveredRows.length ? 'inline-block' : 'none';
-        el('output').hidden = false;
+        el('output').hidden = true;
         el('meta').innerHTML = [`<span class='pill'>Workbook: ${esc(file.name)}</span>`,`<span class='pill'>Mode: Driver Statements</span>`,`<span class='pill'>Warehouse: ${esc(warehouse)}</span>`,`<span class='pill'>Statements: ${deliveredRows.length}</span>`].join('');
         el('summary-cards').innerHTML = `<div class='summary-grid'><div class='card'><div class='label-small'>Driver Statements</div><div class='value'>${deliveredRows.length}</div></div><div class='card'><div class='label-small'>Total Packages</div><div class='value'>${num(data.totalPackages)}</div></div><div class='card'><div class='label-small'>Total Driver Payment</div><div class='value'>${money(data.deliveredDriverTotal)}</div></div></div>`;
         el('report').innerHTML = `<h2>Driver Statements</h2><div class='footer-note'>Each delivered driver has an individual GPL-branded HTML statement in the ZIP download.</div><div class='summary-grid'>${deliveredRows.map((row) => `<div class='card'><div class='label-small'>${esc(row.DriverName)}</div><div class='value'>${money(row.TotalDriverPayment)}</div></div>`).join('') || '<div class="card">No delivered driver statements found.</div>'}</div>`;
@@ -687,7 +687,7 @@ body{font-family:Arial,sans-serif;background:#eef5fb;color:#172b4d;margin:0;padd
       el('download-html').style.display = 'inline-block';
       el('download-zip').style.display = 'inline-block';
 
-      el('output').hidden = false;
+      el('output').hidden = true;
       el('meta').innerHTML = [
         `<span class='pill'>Workbook: ${esc(file.name)}</span>`,
         `<span class='pill'>Mode: ${esc(mode)}</span>`,
