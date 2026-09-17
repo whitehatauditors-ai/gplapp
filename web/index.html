@@ -708,7 +708,6 @@ body{font-family:Arial,sans-serif;background:#eef5fb;color:#172b4d;margin:0;padd
         const t = data.statusTotals[status];
         return `<section class='statement'><div class='statement-head'><div><div class='statement-kicker'>${esc(status)}</div><h3>${esc(status)}</h3></div><div class='statement-total'>Package Qty<br><strong>${num(t.PackageQty)}</strong></div></div><div class='statement-grid'>${status === 'Delivered' ? `
           <div class='statement-item'><span>Package Qty</span><strong>${num(t.PackageQty)}</strong></div>
-          <div class='statement-item'><span>Rate Total</span><strong>${money(t.Rate)}</strong></div>
           <div class='statement-item'><span>Claims</span><strong>${money(t.Claims)}</strong></div>
           <div class='statement-item statement-net'><span>Total Driver Payment</span><strong>${money(t.TotalDriverPayment)}</strong></div>` : `
           <div class='statement-item'><span>Package Qty</span><strong>${num(t.PackageQty)}</strong></div>`}</div></section>`;
