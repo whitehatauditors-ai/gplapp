@@ -510,7 +510,7 @@
       }
     }
 
-    const claimOnlyRows = claimRecords.filter((claim) => !claim.matched).map((claim) => ({ TrackingNo: claim.TrackingNo, Claims: claim.ClaimValue }));
+    const claimOnlyRows = claimRecords.filter((claim) => !claim.matched).map((claim) => ({ TrackingNo: claim.TrackingNo, DriverName: claim.DriverName, Claims: claim.ClaimValue }));
     const claimOnlyTotal = claimOnlyRows.reduce((sum, row) => sum + Number(row.Claims || 0), 0);
 
     const grandTotal = deliveredDriverTotal;
@@ -545,12 +545,23 @@
         ['Claims value column', 'Claim Value ($)'],
         ['Workbook', file.name],
         [],
-        ['Unmatched Tracking Number', 'Unmatched Claim Value'],
-        ...claimOnlyRows.map((r) => [r.TrackingNo, Number(r.Claims)]),
+        ['Unmatched Tracking Number', 'Sheet2 Driver', 'Unmatched Claim Value'],
+        ...claimOnlyRows.map((r) => [r.TrackingNo, r.DriverName, Number(r.Claims)]),
         ['Total Unmatched Claims', Number(claimOnlyTotal)],
+      ];
+      const unmatchedClaimsRows = [
+        ['Unmatched Claims'],
+        ['Claims source sheet', claimSourceTitle || ''],
+        ['Matching order', 'Tracking Number first; Driver fallback second'],
+        ['Workbook', file.name],
+        [],
+        ['Tracking Number', 'Sheet2 Driver', 'Claim Value'],
+        ...claimOnlyRows.map((r) => [r.TrackingNo, r.DriverName, Number(r.Claims)]),
+        ['Total Unmatched Claims', '', Number(claimOnlyTotal)],
       ];
       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summaryRows), 'Summary');
       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(claimsRows), 'Claims');
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(unmatchedClaimsRows), 'Unmatched Claims');
       return XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
     };
 
@@ -563,7 +574,7 @@
         ['Unmatched Claims', claimOnlyRows.length],
       ].map(([label, value]) => `<div class='card'><div class='label-small'>${esc(label)}</div><div class='value'>${typeof value === 'number' ? (String(value).includes('.') ? num(value) : String(value)) : esc(value)}</div></div>`).join('');
 
-      const claimHtml = claimOnlyRows.map((r) => `<tr><td>${esc(r.TrackingNo)}</td><td class='r'>${money(r.Claims)}</td></tr>`).join('') || "<tr><td colspan='2'>No unmatched claims.</td></tr>";
+      const claimHtml = claimOnlyRows.map((r) => `<tr><td>${esc(r.TrackingNo)}</td><td>${esc(r.DriverName)}</td><td class='r'>${money(r.Claims)}</td></tr>`).join('') || "<tr><td colspan='3'>No unmatched claims.</td></tr>";
       const claimRowsPreview = claimOnlyRows.map((r) => `<li>${esc(r.TrackingNo)} — ${money(r.Claims)}</li>`).join('') || '<li>No unmatched claims</li>';
       const statusHtml = ['Delivered', 'Failed Attempt', 'Out for delivery', 'Returned sort Center', 'Blanks'].map((status) => sectionTableHtml(status, statusRows[status], statusTotals[status])).join('');
       const summarySection = `<div class='summary-grid'>${summaryCards}</div>`;
@@ -618,9 +629,9 @@
       <a href='#' class='secondary' download='Global Pack Logistics_Summary.html'>Download Summary HTML</a>
       <a href='#' class='secondary' download='Global Pack Logistics_Summary.zip'>Download Summary ZIP</a>
     </div>
-    <h2>Unmatched Claims From Sheet2</h2>
+    <h2>Unmatched Claims Table</h2>
     <table>
-      <thead><tr><th>Tracking Number</th><th class='r'>Unmatched Claim Value</th></tr></thead>
+      <thead><tr><th>Tracking Number</th><th>Sheet2 Driver</th><th class='r'>Unmatched Claim Value</th></tr></thead>
       <tbody>${claimHtml}</tbody>
     </table>
     <h2>Claims Matching Rule</h2>
@@ -730,9 +741,9 @@ body{font-family:Arial,sans-serif;background:#eef5fb;color:#172b4d;margin:0;padd
       el('report').innerHTML = `
         <h2>Unmatched Claims</h2>
         <table>
-          <thead><tr><th>Tracking Number</th><th class='r'>Unmatched Claim Value</th></tr></thead>
-          <tbody>${data.claimOnlyRows.length ? data.claimOnlyRows.map((r) => `<tr><td>${esc(r.TrackingNo)}</td><td class='r'>${money(r.Claims)}</td></tr>`).join('') : "<tr><td colspan='2'>No unmatched claims</td></tr>"}</tbody>
-          <tfoot><tr><td>Total Unmatched Claims</td><td class='r'>${money(data.claimOnlyTotal)}</td></tr></tfoot>
+          <thead><tr><th>Tracking Number</th><th>Sheet2 Driver</th><th class='r'>Unmatched Claim Value</th></tr></thead>
+          <tbody>${data.claimOnlyRows.length ? data.claimOnlyRows.map((r) => `<tr><td>${esc(r.TrackingNo)}</td><td>${esc(r.DriverName)}</td><td class='r'>${money(r.Claims)}</td></tr>`).join('') : "<tr><td colspan='3'>No unmatched claims</td></tr>"}</tbody>
+          <tfoot><tr><td colspan='2'>Total Unmatched Claims</td><td class='r'>${money(data.claimOnlyTotal)}</td></tr></tfoot>
         </table>
         <div class='note'>Sheet2 claims are first matched to Detail1 TrackingNo. When a tracking ID is absent, the normalized Sheet2 driver is matched to Detail1 DriverName and the Claim Value ($) is deducted once.</div>
         <h2>Detailed Status Sections</h2>
