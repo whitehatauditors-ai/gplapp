@@ -209,7 +209,7 @@
         </div>
         <div class="hint">
           The GPL source sheet is <strong>Detail1</strong> with <strong>DriverName</strong>, <strong>TrackingNo</strong>, <strong>ZipCode</strong>, <strong>CompleteTime</strong>, and <strong>Rate</strong>. Driver names are normalized so multiple spaces do not create duplicate drivers.
-          Claims are charged to drivers by matching <strong>Sheet2 Tracking Number</strong> to <strong>Detail1 TrackingNo</strong>; the matched <strong>Claim Value ($)</strong> is deducted from that driver’s payment.
+          Claims are charged by matching <strong>Sheet2 Tracking Number</strong> to <strong>Detail1 TrackingNo</strong>. If no tracking match exists, the normalized <strong>Sheet2 Driver</strong> links to <strong>Detail1 DriverName</strong>; the matched <strong>Claim Value ($)</strong> is deducted once.
         </div>
         <div id="status"></div>
       </form>
@@ -366,10 +366,12 @@
     });
 
     const claimIndexAliasesTracking = ['Tracking Number', 'TrackingNo', 'Tracking No', 'Tracking #', 'Tracking ID', 'Tracking'];
+    const claimIndexAliasesDriver = ['Driver', 'DriverName', 'Driver Name', 'Last delivery driver', 'Last assigned driver', 'Courier'];
     const claimIndexAliasesValue = ['Claim Value ($)', 'Claim Value', 'Total Claim (Value,Del)', 'Total Claim Value Del', 'Total Claim', 'Claim Amount', 'Penalty Amount'];
 
     let claimRows = null;
     let claimTrackingIdx = null;
+    let claimDriverIdx = null;
     let claimValueIdx = null;
     let claimSourceTitle = '';
     for (const sheetName of wb.SheetNames) {
@@ -378,10 +380,12 @@
       const map = headerMapFor(rows);
       const findIdx = (cands) => cands.map((c) => map.get(norm(c))).find((idx) => idx !== undefined);
       const t = findIdx(claimIndexAliasesTracking);
+      const d = findIdx(claimIndexAliasesDriver);
       const v = findIdx(claimIndexAliasesValue);
       if (t === undefined || v === undefined) continue;
       claimRows = rows;
       claimTrackingIdx = t;
+      claimDriverIdx = d;
       claimValueIdx = v;
       claimSourceTitle = sheetName;
       break;
@@ -395,7 +399,7 @@
         const amount = Math.abs(Number(cell(row, claimValueIdx) || 0));
         if (!tracking || !amount) continue;
         const key = norm(tracking);
-        const record = { TrackingNo: tracking, ClaimValue: -amount, matched: false };
+        const record = { TrackingNo: tracking, DriverName: String(cell(row, claimDriverIdx) || '').replace(/\s+/g, ' ').trim(), ClaimValue: -amount, matched: false };
         claimsByTracking.set(key, record);
         claimRecords.push(record);
       }
@@ -456,6 +460,18 @@
       rec.DaysWorked.add(String(cell(row, dayIdx) || '').trim().toLowerCase().replace(/\s+/g, ' '));
       rec.Deliveries.push({ TrackingNo: tracking, Address: String(addressIdx === undefined ? '' : cell(row, addressIdx) || '').trim(), ZipCode: detailMode ? String(cell(row, zipIdx) || '').trim() : '', CompleteTime: detailMode ? String(cell(row, completeIdx) || '').trim() : '', Status: statusRaw || status, Price: detailMode ? driverPay : 1.6, ClaimValue: claimAmount });
       uniqueDrivers.add(key);
+    }
+
+    // Tracking is authoritative. For claims whose tracking ID is absent from Detail1,
+    // charge once to the normalized Sheet2 driver as an explicit fallback.
+    for (const claim of claimRecords) {
+      if (claim.matched || !claim.DriverName) continue;
+      const driverKey = norm(claim.DriverName);
+      const delivered = grouped.get('Delivered')?.get(driverKey);
+      if (!delivered) continue;
+      delivered.Claims += claim.ClaimValue;
+      delivered.TotalDriverPayment += claim.ClaimValue;
+      claim.matched = true;
     }
 
     const statusRows = { Delivered: [], 'Failed Attempt': [], 'Out for delivery': [], 'Returned sort Center': [], Blanks: [] };
@@ -525,7 +541,7 @@
       const claimsRows = [
         ['Claims / Adjustments'],
         ['Claims source sheet', claimSourceTitle || ''],
-        ['Claims matching', 'Tracking Number → Detail1 TrackingNo'],
+        ['Claims matching', 'Tracking Number → Detail1 TrackingNo; fallback Driver → Detail1 DriverName'],
         ['Claims value column', 'Claim Value ($)'],
         ['Workbook', file.name],
         [],
@@ -608,7 +624,7 @@
       <tbody>${claimHtml}</tbody>
     </table>
     <h2>Claims Matching Rule</h2>
-    <div class='note'>Each Sheet2 <strong>Claim Value ($)</strong> is matched to <strong>Detail1 TrackingNo</strong> and deducted from the matched delivery driver. Unmatched claims remain listed above for review.</div>
+    <div class='note'>Each Sheet2 <strong>Claim Value ($)</strong> is first matched to <strong>Detail1 TrackingNo</strong>. If no tracking match exists, the normalized Sheet2 driver is matched to <strong>Detail1 DriverName</strong>. The claim is deducted from that driver once; unmatched claims remain listed above for review.</div>
     <h2>Detailed Sections</h2>
     ${statusHtml}
   </main>
@@ -718,7 +734,7 @@ body{font-family:Arial,sans-serif;background:#eef5fb;color:#172b4d;margin:0;padd
           <tbody>${data.claimOnlyRows.length ? data.claimOnlyRows.map((r) => `<tr><td>${esc(r.TrackingNo)}</td><td class='r'>${money(r.Claims)}</td></tr>`).join('') : "<tr><td colspan='2'>No unmatched claims</td></tr>"}</tbody>
           <tfoot><tr><td>Total Unmatched Claims</td><td class='r'>${money(data.claimOnlyTotal)}</td></tr></tfoot>
         </table>
-        <div class='note'>Sheet2 claims are charged to the driver whose Detail1 delivery has the same TrackingNo. The Claim Value ($) is deducted from that driver’s total payment.</div>
+        <div class='note'>Sheet2 claims are first matched to Detail1 TrackingNo. When a tracking ID is absent, the normalized Sheet2 driver is matched to Detail1 DriverName and the Claim Value ($) is deducted once.</div>
         <h2>Detailed Status Sections</h2>
         ${statusCards}
       `;
