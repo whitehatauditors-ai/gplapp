@@ -209,7 +209,7 @@
         </div>
         <div class="hint">
           The GPL source sheet is <strong>Detail1</strong> with <strong>DriverName</strong>, <strong>TrackingNo</strong>, <strong>ZipCode</strong>, <strong>CompleteTime</strong>, and <strong>Rate</strong>. Driver names are normalized so multiple spaces do not create duplicate drivers.
-          Claims are matched from a second sheet using <strong>Last delivery driver</strong> and <strong>Total Claim (Value,Del)</strong> (or similar names).
+          Claims are charged to drivers by matching <strong>Sheet2 Tracking Number</strong> to <strong>Detail1 TrackingNo</strong>; the matched <strong>Claim Value ($)</strong> is deducted from that driver’s payment.
         </div>
         <div id="status"></div>
       </form>
@@ -365,11 +365,11 @@
       rateMap.set(norm(driverName), Number.isFinite(rate) ? rate : 0);
     });
 
-    const claimIndexAliasesDriver = ['Last delivery driver', 'Last assigned driver', 'DriverName', 'Driver Name', 'Driver', 'Courier'];
-    const claimIndexAliasesValue = ['Total Claim (Value,Del)', 'Total Claim Value Del', 'Total Claim', 'Claim Amount', 'Penalty Amount'];
+    const claimIndexAliasesTracking = ['Tracking Number', 'TrackingNo', 'Tracking No', 'Tracking #', 'Tracking ID', 'Tracking'];
+    const claimIndexAliasesValue = ['Claim Value ($)', 'Claim Value', 'Total Claim (Value,Del)', 'Total Claim Value Del', 'Total Claim', 'Claim Amount', 'Penalty Amount'];
 
     let claimRows = null;
-    let claimDriverIdx = null;
+    let claimTrackingIdx = null;
     let claimValueIdx = null;
     let claimSourceTitle = '';
     for (const sheetName of wb.SheetNames) {
@@ -377,28 +377,27 @@
       if (rows.length < 2) continue;
       const map = headerMapFor(rows);
       const findIdx = (cands) => cands.map((c) => map.get(norm(c))).find((idx) => idx !== undefined);
-      const d = findIdx(ruleSource === 'Manual' ? ['Name', 'DriverName', 'Driver Name', 'Driver', 'Courier'] : claimIndexAliasesDriver);
-      const v = findIdx(ruleSource === 'Manual' ? ['Total', 'Claim Amount', 'Penalty Amount'] : claimIndexAliasesValue);
-      if (d === undefined || v === undefined) continue;
+      const t = findIdx(claimIndexAliasesTracking);
+      const v = findIdx(claimIndexAliasesValue);
+      if (t === undefined || v === undefined) continue;
       claimRows = rows;
-      claimDriverIdx = d;
+      claimTrackingIdx = t;
       claimValueIdx = v;
       claimSourceTitle = sheetName;
       break;
     }
 
-    const claimMap = new Map();
-    const claimDisplayNames = new Map();
+    const claimsByTracking = new Map();
+    const claimRecords = [];
     if (claimRows) {
       for (const row of claimRows.slice(1)) {
-        const driver = String(cell(row, claimDriverIdx) || '').trim();
-        if (!driver) continue;
+        const tracking = String(cell(row, claimTrackingIdx) || '').trim();
         const amount = Math.abs(Number(cell(row, claimValueIdx) || 0));
-        if (!amount) continue;
-        const key = norm(driver);
-        let display = driver.replace(/\s+/g, ' ').trim();
-        if (!claimDisplayNames.has(key)) claimDisplayNames.set(key, display);
-        claimMap.set(key, (claimMap.get(key) || 0) - amount);
+        if (!tracking || !amount) continue;
+        const key = norm(tracking);
+        const record = { TrackingNo: tracking, ClaimValue: -amount, matched: false };
+        claimsByTracking.set(key, record);
+        claimRecords.push(record);
       }
     }
 
@@ -441,6 +440,10 @@
       }
       const key = norm(driver);
       const displayDriver = driver.replace(/\s+/g, ' ').trim();
+      const tracking = String(trackingIdx === undefined ? '' : cell(row, trackingIdx) || '').trim();
+      const claim = claimsByTracking.get(norm(tracking));
+      if (claim) claim.matched = true;
+      const claimAmount = status === 'Delivered' && claim ? claim.ClaimValue : 0;
       const rec = ensureRec(status, key, displayDriver);
       const sourceRate = detailMode ? Number(cell(row, rateIdx)) : null;
       const driverPay = detailMode ? (sourceRate <= 1 ? 0.5 : sourceRate >= 2.5 ? 1.6 : null) : null;
@@ -448,8 +451,10 @@
       if (detailMode && driverPay === null) throw new Error(`Unsupported Rate ${sourceRate} for ${displayDriver}. Expected 1 or 2.5.`);
       rec.PackageQty += 1;
       if (detailMode) { rec.Rate += sourceRate; rec.TotalDriverPayment += driverPay; }
+      rec.Claims += claimAmount;
+      rec.TotalDriverPayment += claimAmount;
       rec.DaysWorked.add(String(cell(row, dayIdx) || '').trim().toLowerCase().replace(/\s+/g, ' '));
-      rec.Deliveries.push({ TrackingNo: String(trackingIdx === undefined ? '' : cell(row, trackingIdx) || '').trim(), Address: String(addressIdx === undefined ? '' : cell(row, addressIdx) || '').trim(), ZipCode: detailMode ? String(cell(row, zipIdx) || '').trim() : '', CompleteTime: detailMode ? String(cell(row, completeIdx) || '').trim() : '', Status: statusRaw || status, Price: detailMode ? driverPay : 1.6 });
+      rec.Deliveries.push({ TrackingNo: tracking, Address: String(addressIdx === undefined ? '' : cell(row, addressIdx) || '').trim(), ZipCode: detailMode ? String(cell(row, zipIdx) || '').trim() : '', CompleteTime: detailMode ? String(cell(row, completeIdx) || '').trim() : '', Status: statusRaw || status, Price: detailMode ? driverPay : 1.6, ClaimValue: claimAmount });
       uniqueDrivers.add(key);
     }
 
@@ -464,8 +469,8 @@
         if (!rec) continue;
         const packageQty = Number(rec.PackageQty || 0);
         const rate = Number(rec.Rate || 0);
-        const claims = status === 'Delivered' ? Number(claimMap.get(key) || 0) : 0;
-        const totalPayment = status === 'Delivered' ? (detailMode ? rec.TotalDriverPayment : packageQty * 1.6) + claims : 0;
+        const claims = status === 'Delivered' ? Number(rec.Claims || 0) : 0;
+        const totalPayment = status === 'Delivered' ? (detailMode ? rec.TotalDriverPayment : packageQty * 1.6 + claims) : 0;
         const row = {
           DriverName: rec.DriverName,
           PackageQty: packageQty,
@@ -489,16 +494,10 @@
       }
     }
 
-    const claimOnlyRows = [];
-    let claimOnlyTotal = 0;
-    [...claimMap.entries()].sort((a, b) => String(claimDisplayNames.get(a[0]) || a[0]).localeCompare(String(claimDisplayNames.get(b[0]) || b[0]))).forEach(([key, amount]) => {
-      if (uniqueDrivers.has(key)) return;
-      const display = claimDisplayNames.get(key) || key;
-      claimOnlyRows.push({ DriverName: display, Claims: amount });
-      claimOnlyTotal += amount;
-    });
+    const claimOnlyRows = claimRecords.filter((claim) => !claim.matched).map((claim) => ({ TrackingNo: claim.TrackingNo, Claims: claim.ClaimValue }));
+    const claimOnlyTotal = claimOnlyRows.reduce((sum, row) => sum + Number(row.Claims || 0), 0);
 
-    const grandTotal = deliveredDriverTotal + claimsGrandTotal;
+    const grandTotal = deliveredDriverTotal;
 
     const moneyFmt = money;
     const numFmt = num;
@@ -526,11 +525,13 @@
       const claimsRows = [
         ['Claims / Adjustments'],
         ['Claims source sheet', claimSourceTitle || ''],
+        ['Claims matching', 'Tracking Number → Detail1 TrackingNo'],
+        ['Claims value column', 'Claim Value ($)'],
         ['Workbook', file.name],
         [],
-        ['Driver Name', 'Claims'],
-        ...claimOnlyRows.map((r) => [r.DriverName, Number(r.Claims)]),
-        ['Total', Number(claimOnlyTotal)],
+        ['Unmatched Tracking Number', 'Unmatched Claim Value'],
+        ...claimOnlyRows.map((r) => [r.TrackingNo, Number(r.Claims)]),
+        ['Total Unmatched Claims', Number(claimOnlyTotal)],
       ];
       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summaryRows), 'Summary');
       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(claimsRows), 'Claims');
@@ -542,16 +543,14 @@
         ['Drivers', uniqueDrivers.size],
         ['Total Packages', totalPackages],
         ['Driver Grand Total Payout', deliveredDriverTotal],
-        ['Claims Grand Total Payout', claimsGrandTotal],
-        ['Claims Only Drivers', claimOnlyRows.length],
+        ['Claims Grand Total Deduction', claimsGrandTotal],
+        ['Unmatched Claims', claimOnlyRows.length],
       ].map(([label, value]) => `<div class='card'><div class='label-small'>${esc(label)}</div><div class='value'>${typeof value === 'number' ? (String(value).includes('.') ? num(value) : String(value)) : esc(value)}</div></div>`).join('');
 
-      const claimHtml = claimOnlyRows.map((r) => `<tr><td>${esc(r.DriverName)}</td><td class='r'>${money(r.Claims)}</td></tr>`).join('') || "<tr><td colspan='2'>No unmatched claim-only drivers.</td></tr>";
-
+      const claimHtml = claimOnlyRows.map((r) => `<tr><td>${esc(r.TrackingNo)}</td><td class='r'>${money(r.Claims)}</td></tr>`).join('') || "<tr><td colspan='2'>No unmatched claims.</td></tr>";
+      const claimRowsPreview = claimOnlyRows.map((r) => `<li>${esc(r.TrackingNo)} — ${money(r.Claims)}</li>`).join('') || '<li>No unmatched claims</li>';
       const statusHtml = ['Delivered', 'Failed Attempt', 'Out for delivery', 'Returned sort Center', 'Blanks'].map((status) => sectionTableHtml(status, statusRows[status], statusTotals[status])).join('');
-
       const summarySection = `<div class='summary-grid'>${summaryCards}</div>`;
-      const claimRowsPreview = claimOnlyRows.map((r) => `<li>${esc(r.DriverName)} — ${money(r.Claims)}</li>`).join('') || '<li>No claim-only drivers</li>';
 
       return `<!doctype html>
 <html lang='en'>
@@ -603,13 +602,13 @@
       <a href='#' class='secondary' download='Global Pack Logistics_Summary.html'>Download Summary HTML</a>
       <a href='#' class='secondary' download='Global Pack Logistics_Summary.zip'>Download Summary ZIP</a>
     </div>
-    <h2>Claims Imported From Claim Sheet</h2>
+    <h2>Unmatched Claims From Sheet2</h2>
     <table>
-      <thead><tr><th>Driver Name</th><th class='r'>Claims</th></tr></thead>
+      <thead><tr><th>Tracking Number</th><th class='r'>Unmatched Claim Value</th></tr></thead>
       <tbody>${claimHtml}</tbody>
     </table>
-    <h2>Claim-Only Drivers</h2>
-    <div class='note'><ul class='link-list'>${claimRowsPreview}</ul></div>
+    <h2>Claims Matching Rule</h2>
+    <div class='note'>Each Sheet2 <strong>Claim Value ($)</strong> is matched to <strong>Detail1 TrackingNo</strong> and deducted from the matched delivery driver. Unmatched claims remain listed above for review.</div>
     <h2>Detailed Sections</h2>
     ${statusHtml}
   </main>
@@ -701,8 +700,8 @@ body{font-family:Arial,sans-serif;background:#eef5fb;color:#172b4d;margin:0;padd
           <div class='card'><div class='label-small'>Drivers</div><div class='value'>${data.uniqueDrivers}</div></div>
           <div class='card'><div class='label-small'>Total Packages</div><div class='value'>${num(data.totalPackages)}</div></div>
           <div class='card'><div class='label-small'>Driver Grand Total Payout</div><div class='value'>${money(data.deliveredDriverTotal)}</div></div>
-          <div class='card'><div class='label-small'>Claims Grand Total Payout</div><div class='value'>${money(data.claimsGrandTotal)}</div></div>
-          <div class='card'><div class='label-small'>Claims Only Drivers</div><div class='value'>${data.claimOnlyRows.length}</div></div>
+          <div class='card'><div class='label-small'>Claims Grand Total Deduction</div><div class='value'>${money(data.claimsGrandTotal)}</div></div>
+          <div class='card'><div class='label-small'>Unmatched Claims</div><div class='value'>${data.claimOnlyRows.length}</div></div>
         </div>`;
       const statusCards = ['Delivered', 'Failed Attempt', 'Out for delivery', 'Returned sort Center', 'Blanks'].map((status) => {
         const t = data.statusTotals[status];
@@ -713,12 +712,13 @@ body{font-family:Arial,sans-serif;background:#eef5fb;color:#172b4d;margin:0;padd
           <div class='statement-item'><span>Package Qty</span><strong>${num(t.PackageQty)}</strong></div>`}</div></section>`;
       }).join('');
       el('report').innerHTML = `
-        <h2>Claim Summary</h2>
+        <h2>Unmatched Claims</h2>
         <table>
-          <thead><tr><th>Driver Name</th><th class='r'>Claims</th></tr></thead>
-          <tbody>${data.claimOnlyRows.length ? data.claimOnlyRows.map((r) => `<tr><td>${esc(r.DriverName)}</td><td class='r'>${money(r.Claims)}</td></tr>`).join('') : "<tr><td colspan='2'>No claim-only drivers</td></tr>"}</tbody>
-          <tfoot><tr><td>Total</td><td class='r'>${money(data.claimOnlyTotal)}</td></tr></tfoot>
+          <thead><tr><th>Tracking Number</th><th class='r'>Unmatched Claim Value</th></tr></thead>
+          <tbody>${data.claimOnlyRows.length ? data.claimOnlyRows.map((r) => `<tr><td>${esc(r.TrackingNo)}</td><td class='r'>${money(r.Claims)}</td></tr>`).join('') : "<tr><td colspan='2'>No unmatched claims</td></tr>"}</tbody>
+          <tfoot><tr><td>Total Unmatched Claims</td><td class='r'>${money(data.claimOnlyTotal)}</td></tr></tfoot>
         </table>
+        <div class='note'>Sheet2 claims are charged to the driver whose Detail1 delivery has the same TrackingNo. The Claim Value ($) is deducted from that driver’s total payment.</div>
         <h2>Detailed Status Sections</h2>
         ${statusCards}
       `;

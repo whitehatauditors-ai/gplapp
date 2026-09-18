@@ -10,7 +10,7 @@ Browser-first summary portal scaffold for Global Pack Logistics, based on the ap
 - Deployment root: `web/`
 - Google credentials: none in this repository
 
-This initial scaffold updates the customer identity and supplied logo only. The current warehouse selection and payment-calculation behavior remain the Lluberes template defaults until GPL supplies the authoritative warehouse, workbook-column, payment-rate, claims, and access requirements. Do not treat this repository as production-ready until those rules are confirmed.
+This customer-specific GPL workflow uses `Detail1` as the delivery source and `Sheet2` as the claims source. Each `Sheet2` `Tracking Number` is matched to `Detail1` `TrackingNo`; the matched `Claim Value ($)` is deducted from the associated driver’s payment. Unmatched claims remain visible for review.
 
 ## Template behavior
 
@@ -29,6 +29,6 @@ The GitHub Actions workflow deploys `web/` to Cloudflare Pages on pushes to `mai
 2. Warehouse name/selection behavior
 3. Authoritative workbook sheets and column mappings
 4. Payment rates and status rules
-5. Claims source and deduction behavior
+5. Claims source and deduction behavior: `Sheet2` Tracking Number → `Detail1` TrackingNo; deduct `Claim Value ($)`
 6. Login/access requirements
 7. Manager-dashboard registration
