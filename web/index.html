@@ -152,19 +152,14 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
-<body>
+<body class="locked">
   <div class="login-shell" id="login-shell">
-    <form class="login-card" id="login-form">
-      <img class="login-logo" src="./assets/gpl-logo.jpg" alt="Global Pack Logistics logo" />
-      <h2>Credential Login</h2>
-      <p>Enter your access details to open the Global Pack Logistics portal.</p>
-      <label for="login-user">Username</label>
-      <input id="login-user" autocomplete="username" required />
-      <label for="login-pass">Password</label>
-      <input id="login-pass" type="password" autocomplete="current-password" required />
-      <button type="submit">Continue</button>
-      <div class="login-note" id="login-status">Front-end login screen only.</div>
-    </form>
+    <div class="login-card" id="login-card">
+      <img class="login-logo" src="./assets/whitehatdata-logo.jpg" alt="WhiteHatData logo" />
+      <h2>Private Customer Portal</h2>
+      <p>Authorized customer access only.</p>
+      <button id="agree-button" type="button">Agree and Continue</button>
+    </div>
   </div>
   <main>
     <header>
@@ -234,14 +229,7 @@
     document.body.classList.remove('locked');
     el('login-shell').hidden = true;
   };
-  el('login-form').addEventListener('submit', (event) => {
-    event.preventDefault();
-    const user = el('login-user').value.trim();
-    const pass = el('login-pass').value.trim();
-    if (!user || !pass) {
-      el('login-status').textContent = 'Enter both username and password.';
-      return;
-    }
+  el('agree-button').addEventListener('click', () => {
     unlockPortal();
   });
   const state = { summaryBlobUrl: null, htmlBlobUrl: null, zipBlobUrl: null };
