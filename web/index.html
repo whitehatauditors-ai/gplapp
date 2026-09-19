@@ -224,6 +224,18 @@
     return text.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
   };
   const cell = (row, idx0) => (row && row[idx0] !== undefined ? row[idx0] : '');
+  const dayKey = (value) => {
+    if (value === null || value === undefined || String(value).trim() === '') return '';
+    if (typeof value === 'number' && XLSX.SSF && XLSX.SSF.parse_date_code) {
+      const parsed = XLSX.SSF.parse_date_code(value);
+      if (parsed && parsed.y && parsed.m && parsed.d) return `${parsed.y}-${String(parsed.m).padStart(2, '0')}-${String(parsed.d).padStart(2, '0')}`;
+    }
+    const text = String(value).trim();
+    const isoDate = text.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (isoDate) return isoDate[1];
+    const parsed = new Date(text);
+    return Number.isNaN(parsed.getTime()) ? text.toLowerCase().replace(/\s+/g, ' ') : parsed.toISOString().slice(0, 10);
+  };
   const setStatus = (kind, html) => { el('status').innerHTML = html ? `<div class="${kind}">${html}</div>` : ''; };
   const resetDownloads = () => {
     [state.summaryBlobUrl, state.htmlBlobUrl, state.zipBlobUrl].forEach((url) => url && URL.revokeObjectURL(url));
@@ -250,7 +262,7 @@
     let detailMode = false;
     let headerMap = null;
     let headerRowIdx = null;
-    const required = new Set(['drivername', 'finalstatus', 'plandeliverydate']);
+    const required = new Set(['drivername', 'finalstatus', 'completetime']);
     const preferred = new Set(['result', 'pld']);
 
     const tryMatchSource = (rows) => {
@@ -312,7 +324,7 @@
 
     const driverIdx = headerMap.get('drivername');
     const statusIdx = headerMap.get('finalstatus');
-    const dayIdx = headerMap.get('plandeliverydate');
+    const dayIdx = headerMap.get('completetime');
     const trackingIdx = ['trackingno', 'tracking no', 'tracking number', 'tracking #', 'tracking id', 'tracking'].map(norm).map((name) => headerMap.get(name)).find((idx) => idx !== undefined);
     const addressIdx = ['address', 'delivery address', 'dropoff address', 'customer address', 'deliveryaddress', '地址'].map(norm).map((name) => headerMap.get(name)).find((idx) => idx !== undefined);
     const zipIdx = detailMode ? headerMap.get('zipcode') : undefined;
@@ -422,7 +434,8 @@
       if (detailMode) { rec.Rate += sourceRate; rec.TotalDriverPayment += driverPay; }
       rec.Claims += claimAmount;
       rec.TotalDriverPayment += claimAmount;
-      rec.DaysWorked.add(String(cell(row, dayIdx) || '').trim().toLowerCase().replace(/\s+/g, ' '));
+      const workedDay = dayKey(cell(row, dayIdx));
+      if (workedDay) rec.DaysWorked.add(workedDay);
       rec.Deliveries.push({ TrackingNo: tracking, Address: String(addressIdx === undefined ? '' : cell(row, addressIdx) || '').trim(), ZipCode: detailMode ? String(cell(row, zipIdx) || '').trim() : '', CompleteTime: detailMode ? String(cell(row, completeIdx) || '').trim() : '', Status: statusRaw || status, Price: detailMode ? driverPay : 1.6, ClaimValue: claimAmount });
       uniqueDrivers.add(key);
     }
@@ -486,7 +499,7 @@
       const deliveredOnly = status === 'Delivered';
       if (deliveredOnly) {
         const body = rows.map((r) => `<tr><td>${esc(r.DriverName)}</td><td class='r'>${num(r.PackageQty)}</td><td class='r'>${money(r.Rate)}</td><td class='r'>${money(r.Claims)}</td><td class='r'>${money(r.TotalDriverPayment)}</td></tr>`).join('') || "<tr><td colspan='5'>No rows found.</td></tr>";
-        return `<section class='block'><div class='section-head'><h2>${esc(status)}</h2><p>GPL driver pay uses the Detail1 Rate: Rate 1 or less pays <strong>$0.50</strong>; Rate 2.5 or more pays <strong>$1.60</strong>. Claims remain separate deductions. Days worked is counted from distinct <code>planDeliveryDate</code> values when available.</p></div><table><thead><tr><th>DriverName</th><th class='r'>Package Qty</th><th class='r'>Rate</th><th class='r'>Claims</th><th class='r'>Total Driver Payment</th></tr></thead><tbody>${body}</tbody><tfoot><tr><td>Total</td><td class='r'>${num(totals.PackageQty)}</td><td class='r'>${money(totals.Rate)}</td><td class='r'>${money(totals.Claims)}</td><td class='r'>${money(totals.TotalDriverPayment)}</td></tr></tfoot></table></section>`;
+        return `<section class='block'><div class='section-head'><h2>${esc(status)}</h2><p>GPL driver pay uses the Detail1 Rate: Rate 1 or less pays <strong>$0.50</strong>; Rate 2.5 or more pays <strong>$1.60</strong>. Claims remain separate deductions. Days worked is counted from distinct calendar dates in <code>CompleteTime</code>.</p></div><table><thead><tr><th>DriverName</th><th class='r'>Package Qty</th><th class='r'>Rate</th><th class='r'>Claims</th><th class='r'>Total Driver Payment</th></tr></thead><tbody>${body}</tbody><tfoot><tr><td>Total</td><td class='r'>${num(totals.PackageQty)}</td><td class='r'>${money(totals.Rate)}</td><td class='r'>${money(totals.Claims)}</td><td class='r'>${money(totals.TotalDriverPayment)}</td></tr></tfoot></table></section>`;
       }
       const body = rows.map((r) => `<tr><td>${esc(r.DriverName)}</td><td class='r'>${num(r.PackageQty)}</td></tr>`).join('') || "<tr><td colspan='2'>No rows found.</td></tr>";
       return `<section class='block compact'><div class='section-head'><h2>${esc(status)}</h2><p>Not payable.</p></div><table><thead><tr><th>DriverName</th><th class='r'>Package Qty</th></tr></thead><tbody>${body}</tbody><tfoot><tr><td>Total</td><td class='r'>${num(totals.PackageQty)}</td></tr></tfoot></table></section>`;
