@@ -39,10 +39,27 @@ function loginPage(message = '') {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Private Customer Portal</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#07111f;color:#e5e7eb;font-family:Arial,sans-serif}.card{width:min(420px,calc(100% - 40px));padding:28px;border:1px solid #374151;border-radius:18px;background:#111827;box-shadow:0 24px 70px #0006;text-align:center}.logo{display:block;width:min(367px,100%);height:auto;margin:0 auto 22px}.card h1{font-size:25px;margin:0 0 8px}.card p{color:#94a3b8;margin:0 0 20px}.field{display:block;text-align:left;margin:12px 0 6px;font-weight:700}input{width:100%;box-sizing:border-box;padding:13px;border:1px solid #4b5563;border-radius:10px;background:#0b1220;color:#fff;font-size:16px}button{width:100%;margin-top:18px;padding:13px;border:0;border-radius:10px;background:#d71920;color:#fff;font-weight:800;font-size:16px;cursor:pointer}.error{margin-top:14px;color:#fca5a5}</style></head><body><main class="card"><img class="logo" src="/assets/whitehatdata-logo.jpg" alt="White Hat Data"><h1>Private Customer Portal</h1><p>Authorized customer access only.</p><form method="post" action="/api/auth"><label class="field" for="username">Username</label><input id="username" name="username" autocomplete="username" required><label class="field" for="password">Password</label><input id="password" name="password" type="password" autocomplete="current-password" required><button type="submit">Agree and Continue</button>${safeMessage ? `<div class="error">${safeMessage}</div>` : ''}</form></main></body></html>`;
 }
 
-export async function onRequest(context) {
-  const path = new URL(context.request.url).pathname;
-  if (path === '/api/auth' || path.startsWith('/assets/')) return context.next();
-  if (!['/', '/index.html'].includes(path)) return context.next();
-  if (await validSession(context.request, context.env)) return context.next();
-  return new Response(loginPage(), { status: 401, headers: { 'content-type': 'text/html; charset=UTF-8', 'cache-control': 'no-store' } });
+function response(body, status, headers = {}) {
+  return new Response(body, { status, headers: { 'cache-control': 'no-store', ...headers } });
 }
+
+export default {
+  async fetch(request, env) {
+    const url = new URL(request.url);
+    if (url.pathname === '/api/auth') {
+      if (request.method !== 'POST') return response('Method Not Allowed', 405);
+      if (!env.Username || !env.password) return response('Portal credentials are not configured.', 503);
+      const form = await request.formData();
+      const username = String(form.get('username') || '');
+      const password = String(form.get('password') || '');
+      if (username !== env.Username || password !== env.password) return new Response(loginPage('Invalid username or password.'), { status: 401, headers: { 'content-type': 'text/html; charset=UTF-8', 'cache-control': 'no-store' } });
+      const payload = base64url(enc.encode(JSON.stringify({ user: username, exp: Date.now() + 8 * 60 * 60 * 1000 })));
+      const token = `${payload}.${await signature(env.password, payload)}`;
+      return new Response(null, { status: 303, headers: { location: '/', 'set-cookie': `gpl_session=${encodeURIComponent(token)}; Max-Age=28800; Path=/; Secure; HttpOnly; SameSite=Lax`, 'cache-control': 'no-store' } });
+    }
+    if (url.pathname === '/' || url.pathname === '/index.html') {
+      if (!(await validSession(request, env))) return new Response(loginPage(), { status: 401, headers: { 'content-type': 'text/html; charset=UTF-8', 'cache-control': 'no-store' } });
+    }
+    return env.ASSETS.fetch(request);
+  }
+};
