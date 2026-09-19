@@ -250,7 +250,7 @@
     let detailMode = false;
     let headerMap = null;
     let headerRowIdx = null;
-    const required = new Set(['drivername', 'finalstatus', 'plandeliverydate']);
+    const required = new Set(['drivername', 'finalstatus', 'time']);
     const preferred = new Set(['result', 'pld']);
 
     const tryMatchSource = (rows) => {
@@ -307,12 +307,12 @@
       }
     }
     if (!sourceRows || !headerMap || headerRowIdx === null) {
-      throw new Error('The workbook must contain a Detail1 sheet with DriverName, TrackingNo, ZipCode, CompleteTime, and Rate.');
+      throw new Error('The workbook must contain a Detail1 sheet with DriverName, TrackingNo, ZipCode, CompleteTime, Rate, and TIME.');
     }
 
     const driverIdx = headerMap.get('drivername');
     const statusIdx = headerMap.get('finalstatus');
-    const dayIdx = headerMap.get('plandeliverydate');
+    const dayIdx = headerMap.get('time');
     const trackingIdx = ['trackingno', 'tracking no', 'tracking number', 'tracking #', 'tracking id', 'tracking'].map(norm).map((name) => headerMap.get(name)).find((idx) => idx !== undefined);
     const addressIdx = ['address', 'delivery address', 'dropoff address', 'customer address', 'deliveryaddress', '地址'].map(norm).map((name) => headerMap.get(name)).find((idx) => idx !== undefined);
     const zipIdx = detailMode ? headerMap.get('zipcode') : undefined;
@@ -486,7 +486,7 @@
       const deliveredOnly = status === 'Delivered';
       if (deliveredOnly) {
         const body = rows.map((r) => `<tr><td>${esc(r.DriverName)}</td><td class='r'>${num(r.PackageQty)}</td><td class='r'>${money(r.Rate)}</td><td class='r'>${money(r.Claims)}</td><td class='r'>${money(r.TotalDriverPayment)}</td></tr>`).join('') || "<tr><td colspan='5'>No rows found.</td></tr>";
-        return `<section class='block'><div class='section-head'><h2>${esc(status)}</h2><p>GPL driver pay uses the Detail1 Rate: Rate 1 or less pays <strong>$0.50</strong>; Rate 2.5 or more pays <strong>$1.60</strong>. Claims remain separate deductions. Days worked is counted from distinct <code>planDeliveryDate</code> values when available.</p></div><table><thead><tr><th>DriverName</th><th class='r'>Package Qty</th><th class='r'>Rate</th><th class='r'>Claims</th><th class='r'>Total Driver Payment</th></tr></thead><tbody>${body}</tbody><tfoot><tr><td>Total</td><td class='r'>${num(totals.PackageQty)}</td><td class='r'>${money(totals.Rate)}</td><td class='r'>${money(totals.Claims)}</td><td class='r'>${money(totals.TotalDriverPayment)}</td></tr></tfoot></table></section>`;
+        return `<section class='block'><div class='section-head'><h2>${esc(status)}</h2><p>GPL driver pay uses the Detail1 Rate: Rate 1 or less pays <strong>$0.50</strong>; Rate 2.5 or more pays <strong>$1.60</strong>. Claims remain separate deductions. Days worked is counted from distinct <code>TIME</code> values.</p></div><table><thead><tr><th>DriverName</th><th class='r'>Package Qty</th><th class='r'>Rate</th><th class='r'>Claims</th><th class='r'>Total Driver Payment</th></tr></thead><tbody>${body}</tbody><tfoot><tr><td>Total</td><td class='r'>${num(totals.PackageQty)}</td><td class='r'>${money(totals.Rate)}</td><td class='r'>${money(totals.Claims)}</td><td class='r'>${money(totals.TotalDriverPayment)}</td></tr></tfoot></table></section>`;
       }
       const body = rows.map((r) => `<tr><td>${esc(r.DriverName)}</td><td class='r'>${num(r.PackageQty)}</td></tr>`).join('') || "<tr><td colspan='2'>No rows found.</td></tr>";
       return `<section class='block compact'><div class='section-head'><h2>${esc(status)}</h2><p>Not payable.</p></div><table><thead><tr><th>DriverName</th><th class='r'>Package Qty</th></tr></thead><tbody>${body}</tbody><tfoot><tr><td>Total</td><td class='r'>${num(totals.PackageQty)}</td></tr></tfoot></table></section>`;
