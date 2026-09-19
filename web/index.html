@@ -152,15 +152,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
-<body class="locked">
-  <div class="login-shell" id="login-shell">
-    <div class="login-card" id="login-card">
-      <img class="login-logo" src="./assets/whitehatdata-logo.jpg" alt="WhiteHatData logo" />
-      <h2>Private Customer Portal</h2>
-      <p>Authorized customer access only.</p>
-      <button id="agree-button" type="button">Agree and Continue</button>
-    </div>
-  </div>
+<body>
   <main>
     <header>
       <div class="logo-wrap"><img class="logo-mark" src="./assets/gpl-logo.jpg" alt="Global Pack Logistics logo" /></div>
@@ -217,17 +209,6 @@
 <script>
 (() => {
   const el = (id) => document.getElementById(id);
-  const lockPortal = () => {
-    document.body.classList.add('locked');
-    el('login-shell').hidden = false;
-  };
-  const unlockPortal = () => {
-    document.body.classList.remove('locked');
-    el('login-shell').hidden = true;
-  };
-  el('agree-button').addEventListener('click', () => {
-    unlockPortal();
-  });
   const state = { summaryBlobUrl: null, htmlBlobUrl: null, zipBlobUrl: null };
   const money = (v) => {
     const n = Number(v || 0);
