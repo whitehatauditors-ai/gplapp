@@ -62,6 +62,9 @@ export default {
     if (url.pathname === '/' || url.pathname === '/index.html') {
       if (!(await validSession(request, env))) return new Response(loginPage('', portalPrefix), { status: 401, headers: { 'content-type': 'text/html; charset=UTF-8', 'cache-control': 'no-store' } });
     }
-    return env.ASSETS.fetch(request);
+    // Static assets should resolve by pathname; query strings are only cache-busters.
+    const assetUrl = new URL(request.url);
+    assetUrl.search = '';
+    return env.ASSETS.fetch(new Request(assetUrl, request));
   }
 };
