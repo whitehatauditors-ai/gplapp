@@ -438,7 +438,7 @@
       rec.TotalDriverPayment += claimAmount;
       const workedDay = dayKey(cell(row, dayIdx));
       if (workedDay) rec.DaysWorked.add(workedDay);
-      rec.Deliveries.push({ TrackingNo: tracking, Address: String(addressIdx === undefined ? '' : cell(row, addressIdx) || '').trim(), ZipCode: detailMode ? String(cell(row, zipIdx) || '').trim() : '', CompleteTime: detailMode ? String(cell(row, completeIdx) || '').trim() : '', Status: statusRaw || status, Price: detailMode ? driverPay : 1.6, ClaimValue: claimAmount });
+      rec.Deliveries.push({ TrackingNo: tracking, Address: String(addressIdx === undefined ? '' : cell(row, addressIdx) || '').trim(), ZipCode: detailMode ? String(cell(row, zipIdx) || '').trim() : '', CompleteTime: detailMode ? String(cell(row, completeIdx) || '').trim() : '', CompleteDate: detailMode ? dayKey(cell(row, completeIdx)) : '', Status: statusRaw || status, Price: detailMode ? driverPay : 1.6, ClaimValue: claimAmount });
       uniqueDrivers.add(key);
     }
 
@@ -659,7 +659,7 @@
           const dailySummary = new Map();
           (row.Deliveries || []).forEach((delivery) => {
             const rawDate = String(delivery.CompleteTime || '').trim();
-            const day = rawDate.match(/^\\d{4}-\\d{2}-\\d{2}/)?.[0] || rawDate || 'Unknown date';
+            const day = delivery.CompleteDate || rawDate.match(/^\\d{4}-\\d{2}-\\d{2}/)?.[0] || rawDate || 'Unknown date';
             const price = Number(delivery.Price || 0);
             const current = dailySummary.get(day) || { day, qty05: 0, qty16: 0, totalPackages: 0, totalPaid: 0 };
             if (Math.abs(price - 0.5) < 0.001) current.qty05 += 1;
