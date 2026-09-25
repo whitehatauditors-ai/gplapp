@@ -269,7 +269,8 @@
       for (let idx = 0; idx < Math.min(10, rows.length); idx++) {
         const current = headerMapFor(rows.slice(idx));
         if ([...required].every((key) => current.has(key))) {
-          return { rows, headerMap: current, headerRowIdx: idx };
+          const detailLike = current.has('trackingno') && current.has('zipcode') && current.has('confirm rate');
+          return { rows, headerMap: current, headerRowIdx: idx, detailMode: detailLike };
         }
       }
       return null;
@@ -299,6 +300,7 @@
           headerMap = matched.headerMap;
           headerRowIdx = matched.headerRowIdx;
           sourceTitle = sheetName;
+          detailMode = matched.detailMode;
           break;
         }
       }
@@ -314,6 +316,7 @@
           headerMap = matched.headerMap;
           headerRowIdx = matched.headerRowIdx;
           sourceTitle = sheetName;
+          detailMode = matched.detailMode;
           break;
         }
       }
