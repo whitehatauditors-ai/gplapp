@@ -279,7 +279,7 @@
       if (norm(sheetName) !== 'detail1') continue;
       const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, defval: '' });
       const current = headerMapFor(rows);
-      const detailRequired = ['drivername', 'trackingno', 'zipcode', 'completetime', 'rate'];
+      const detailRequired = ['drivername', 'trackingno', 'zipcode', 'completetime', 'confirm rate'];
       if (detailRequired.every((key) => current.has(key))) {
         sourceRows = rows;
         headerMap = current;
@@ -319,7 +319,7 @@
       }
     }
     if (!sourceRows || !headerMap || headerRowIdx === null) {
-      throw new Error('The workbook must contain a Detail1 sheet with DriverName, TrackingNo, ZipCode, CompleteTime, and Rate.');
+      throw new Error('The workbook must contain a Detail1 sheet with DriverName, TrackingNo, ZipCode, CompleteTime, and CONFIRM RATE.');
     }
 
     const driverIdx = headerMap.get('drivername');
@@ -329,7 +329,7 @@
     const addressIdx = ['address', 'delivery address', 'dropoff address', 'customer address', 'deliveryaddress', '地址'].map(norm).map((name) => headerMap.get(name)).find((idx) => idx !== undefined);
     const zipIdx = detailMode ? headerMap.get('zipcode') : undefined;
     const completeIdx = detailMode ? headerMap.get('completetime') : undefined;
-    const rateIdx = detailMode ? headerMap.get('rate') : undefined;
+    const rateIdx = detailMode ? headerMap.get('confirm rate') : undefined;
 
     const defaultRate = 1.6;
     const rateText = '';
@@ -428,8 +428,8 @@
       const rec = ensureRec(status, key, displayDriver);
       const sourceRate = detailMode ? Number(cell(row, rateIdx)) : null;
       const driverPay = detailMode ? (sourceRate <= 1 ? 0.5 : sourceRate >= 2.5 ? 1.6 : null) : null;
-      if (detailMode && !Number.isFinite(sourceRate)) throw new Error(`Invalid Rate for ${displayDriver}: ${cell(row, rateIdx)}`);
-      if (detailMode && driverPay === null) throw new Error(`Unsupported Rate ${sourceRate} for ${displayDriver}. Expected 1 or 2.5.`);
+      if (detailMode && !Number.isFinite(sourceRate)) throw new Error(`Invalid CONFIRM RATE for ${displayDriver}: ${cell(row, rateIdx)}`);
+      if (detailMode && driverPay === null) throw new Error(`Unsupported CONFIRM RATE ${sourceRate} for ${displayDriver}. Expected 1 or 2.5.`);
       rec.PackageQty += 1;
       if (detailMode) { rec.Rate += sourceRate; rec.TotalDriverPayment += driverPay; }
       rec.Claims += claimAmount;
@@ -499,7 +499,7 @@
       const deliveredOnly = status === 'Delivered';
       if (deliveredOnly) {
         const body = rows.map((r) => `<tr><td>${esc(r.DriverName)}</td><td class='r'>${num(r.PackageQty)}</td><td class='r'>${money(r.Rate)}</td><td class='r'>${money(r.Claims)}</td><td class='r'>${money(r.TotalDriverPayment)}</td></tr>`).join('') || "<tr><td colspan='5'>No rows found.</td></tr>";
-        return `<section class='block'><div class='section-head'><h2>${esc(status)}</h2><p>GPL driver pay uses the Detail1 Rate: Rate 1 or less pays <strong>$0.50</strong>; Rate 2.5 or more pays <strong>$1.60</strong>. Claims remain separate deductions. Days worked is counted from distinct calendar dates in <code>CompleteTime</code>.</p></div><table><thead><tr><th>DriverName</th><th class='r'>Package Qty</th><th class='r'>Rate</th><th class='r'>Claims</th><th class='r'>Total Driver Payment</th></tr></thead><tbody>${body}</tbody><tfoot><tr><td>Total</td><td class='r'>${num(totals.PackageQty)}</td><td class='r'>${money(totals.Rate)}</td><td class='r'>${money(totals.Claims)}</td><td class='r'>${money(totals.TotalDriverPayment)}</td></tr></tfoot></table></section>`;
+        return `<section class='block'><div class='section-head'><h2>${esc(status)}</h2><p>GPL driver pay uses the Detail1 CONFIRM RATE: CONFIRM RATE 1 or less pays <strong>$0.50</strong>; CONFIRM RATE 2.5 or more pays <strong>$1.60</strong>. Claims remain separate deductions. Days worked is counted from distinct calendar dates in <code>CompleteTime</code>.</p></div><table><thead><tr><th>DriverName</th><th class='r'>Package Qty</th><th class='r'>CONFIRM RATE</th><th class='r'>Claims</th><th class='r'>Total Driver Payment</th></tr></thead><tbody>${body}</tbody><tfoot><tr><td>Total</td><td class='r'>${num(totals.PackageQty)}</td><td class='r'>${money(totals.Rate)}</td><td class='r'>${money(totals.Claims)}</td><td class='r'>${money(totals.TotalDriverPayment)}</td></tr></tfoot></table></section>`;
       }
       const body = rows.map((r) => `<tr><td>${esc(r.DriverName)}</td><td class='r'>${num(r.PackageQty)}</td></tr>`).join('') || "<tr><td colspan='2'>No rows found.</td></tr>";
       return `<section class='block compact'><div class='section-head'><h2>${esc(status)}</h2><p>Not payable.</p></div><table><thead><tr><th>DriverName</th><th class='r'>Package Qty</th></tr></thead><tbody>${body}</tbody><tfoot><tr><td>Total</td><td class='r'>${num(totals.PackageQty)}</td></tr></tfoot></table></section>`;
