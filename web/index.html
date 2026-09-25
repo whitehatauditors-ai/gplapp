@@ -277,16 +277,15 @@
     };
 
     for (const sheetName of wb.SheetNames) {
-      if (norm(sheetName) !== 'detail1') continue;
+      if (!norm(sheetName).includes('detail')) continue;
       const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, defval: '' });
-      const current = headerMapFor(rows);
-      const detailRequired = ['drivername', 'trackingno', 'zipcode', 'completetime', 'confirm rate'];
-      if (detailRequired.every((key) => current.has(key))) {
+      const matched = tryMatchSource(rows);
+      if (matched) {
         sourceRows = rows;
-        headerMap = current;
-        headerRowIdx = 0;
+        headerMap = matched.headerMap;
+        headerRowIdx = matched.headerRowIdx;
         sourceTitle = sheetName;
-        detailMode = true;
+        detailMode = matched.detailMode;
         break;
       }
     }
