@@ -154,6 +154,7 @@
 </head>
 <body>
   <main>
+    <div id="usageBanner" role="status" style="margin:0 0 14px;padding:12px 16px;border:1px solid #bfdbfe;border-radius:10px;background:#eff6ff;color:#1e3a8a;font-weight:700;">Last report generated: —</div>
     <header>
       <div class="logo-wrap"><img class="logo-mark" src="./assets/gpl-logo.jpg" alt="Global Pack Logistics logo" /></div>
       <h1>Global Pack Logistics Summary Runner</h1>
@@ -635,6 +636,9 @@
 
   el('runner').addEventListener('submit', async (e) => {
     e.preventDefault();
+    const usageBanner = el('usageBanner');
+    if (usageBanner) usageBanner.textContent = 'Last report generated: ' + new Date().toLocaleString();
+    void fetch('https://portal-usage.whitehatauditors.workers.dev/event', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ customer: 'GPL', portalPath: '/gpl' }) }).catch(() => {});
     resetDownloads();
     setStatus('', '');
 
